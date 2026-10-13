@@ -66,7 +66,7 @@ export interface BrandBookData {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  backend: 'http://localhost:8787',
+  backend: 'https://grab-server-lz29.onrender.com',
   theme: 'auto',
   hideSmall: false,
   deep: false,

@@ -8,7 +8,6 @@
   "documentAccess": "dynamic-page",
   "networkAccess": {
     "allowedDomains": ["https://grab-server-lz29.onrender.com"],
-    "devAllowedDomains": ["http://localhost:8787"],
     "reasoning": "GRAB sends the links you paste to its own backend, which finds the images and videos on those pages and returns previews. Files are fetched only when you download or insert them."
   }
 }

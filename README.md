@@ -18,7 +18,7 @@ cd ../plugin && npm install && npm run build   # makes dist/index.html + dist/co
 ```
 In Figma desktop: Plugins → Development → Import plugin from manifest → pick `plugin/manifest.json`.
 (Set `id` in the manifest to any value for local use; Figma gives you a real one when you publish.)
-The default server address is `http://localhost:8787` (allowed by `devAllowedDomains`).
+The plugin always uses the hosted server (`https://grab-server-lz29.onrender.com`, set as `DEFAULT_SETTINGS.backend` in `plugin/src/shared/messages.ts` and in `manifest.json` → `allowedDomains`). There is no server setting in the plugin; to point it elsewhere, change both places and rebuild.
 
 Optional extras (the server finds them on its own at start; restart after installing):
 - Deep scan (JavaScript sites, measured brand colors): `cd server && npx playwright install chromium`. If that browser cannot start on your PC, an installed Chrome or Edge is used instead.
@@ -28,7 +28,7 @@ Optional extras (the server finds them on its own at start; restart after instal
 2. Render → New → Blueprint → pick the repo (it reads `render.yaml`; the Docker image already includes the headless browser).
 3. After deploy, copy the URL, e.g. `https://grab-server.onrender.com`.
 4. In `plugin/manifest.json` replace `REPLACE-WITH-YOUR-BACKEND.onrender.com` with your host, then `cd plugin && npm run build`.
-5. In the plugin, open Settings (gear) and set the server address to that URL.
+5. Put that URL in `DEFAULT_SETTINGS.backend` (`plugin/src/shared/messages.ts`) as well, and rebuild.
 
 Free tier sleeps after ~15 min idle. The plugin shows "waking server" and retries for up to 90 s.
 Behind Render's proxy set `GRAB_TRUST_PROXY=1` (the Dockerfile already does).

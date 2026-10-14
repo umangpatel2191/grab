@@ -10,6 +10,7 @@ export interface Settings {
   pages: number;
   /** Downloads and Figma inserts: original files first, small images enlarged 2×. */
   hd: boolean;
+  /** Developers who really want a local server keep it (set when saved from Settings). */
 }
 
 export interface HistoryEntry {

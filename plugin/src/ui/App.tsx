@@ -35,7 +35,10 @@ export function App() {
   useEffect(() => {
     const off = onMain((m) => {
       if (m.type !== 'storage:data') return;
-      if (m.settings) setSettingsState({ ...DEFAULT_SETTINGS, ...m.settings });
+      if (m.settings) {
+        // the plugin always talks to the hosted GRAB server, whatever an older build saved
+        setSettingsState({ ...DEFAULT_SETTINGS, ...m.settings, backend: DEFAULT_SETTINGS.backend });
+      }
       if (m.history) setHistory(m.history);
       setLoaded(true);
     });
@@ -195,7 +198,7 @@ export function App() {
             server={server}
             starting={scan.phase === 'starting'}
             startingFor={scan.phase === 'starting' ? Math.floor((Date.now() - startedAt) / 1000) : 0}
-            error={scan.phase === 'error' ? scan.error?.message ?? 'Something went wrong.' : server.state === 'down' ? 'The server is not answering. Check Settings, or try again in a minute.' : null}
+            error={scan.phase === 'error' ? scan.error?.message ?? 'Something went wrong.' : server.state === 'down' ? 'The GRAB server is waking up or busy. It retries on its own; try again in a minute.' : null}
             onFetch={startScan}
             onClearHistory={clearHistory}
           />

@@ -42,7 +42,7 @@ const base = `
     .foot { position: absolute; left: 100px; bottom: 80px; font-size: 22px; color: rgba(255,255,255,.45); font-weight: 500; }
   </style>`;
 
-const win = (shot, { x, y, w, h, title = 'GRAB – Website to Brand Kit', top = 0 }) => `
+const win = (shot, { x, y, w, h, title = 'GRAB – Website Images, Colors &amp; Fonts', top = 0 }) => `
   <div class="win" style="left:${x}px; top:${y}px; width:${w}px; height:${h}px">
     <div class="bar"><i></i><i></i><i></i><span>${title}</span></div>
     <div style="height:${h - 44}px; overflow:hidden"><img class="shot" src="${img(shot)}" style="margin-top:-${top}px"></div>

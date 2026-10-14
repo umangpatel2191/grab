@@ -4,14 +4,15 @@ Paste these into the publish form (Plugins → Development → GRAB → **Publis
 
 ## Name
 ```
-GRAB – Website to Brand Kit
+GRAB – Website Images, Colors & Fonts
 ```
-(The manifest name is the same. It contains the words people search for: *website*, *brand kit*.)
+(The manifest name is the same. It covers the three things people search for: website *images*, *colors* and *fonts*; "GRAB" also matches "grab".)
 
 ## Tagline (≤ 50 characters; Figma uses it for search)
 ```
-Images, colors & fonts from any website
+Collect any site's assets & brand kit in Figma
 ```
+(47 characters: adds *collect*, *assets* and *brand kit*, which the name does not have.)
 
 ## Category
 **Design tools**

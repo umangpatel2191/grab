@@ -10,7 +10,7 @@ let h: AppHandle;
 
 beforeAll(async () => {
   fx = await startFixture();
-  h = await createApp({ allowPrivate: true, fetchTimeoutMs: 4000, scanRateLimitPerMinute: 1000, rateLimitPerMinute: 100000, logger: undefined } as never);
+  h = await createApp({ allowPrivate: true, measurePages: false, fetchTimeoutMs: 4000, scanRateLimitPerMinute: 1000, rateLimitPerMinute: 100000, logger: undefined } as never);
 });
 afterAll(async () => {
   await h.close();

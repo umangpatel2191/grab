@@ -2,7 +2,7 @@ import type { Candidate, ReasonCode, ScanOptions } from '../../shared/types';
 import { guessMime, variantKey } from '../../shared/urls';
 import type { Config } from './config';
 import { deepAvailable, renderWithBrowser, type RenderedPage } from './extract/deep';
-import { colorsFromCss, colorsFromImage, colorsFromManifest, colorsFromSvgPaints, colorsFromUi, extractBrandHints, mergeBrandColors, usageFromHtml } from './extract/brand';
+import { colorDistance, isNeutral as isNeutralHex, colorsFromCss, colorsFromImage, colorsFromManifest, colorsFromScreenshot, colorsFromSvgPaints, colorsFromUi, extractBrandHints, mergeBrandColors, usageFromHtml } from './extract/brand';
 import { cssImports, extractCssImageUrls, extractFromHtml, isCrawlablePage, type ExtractResult } from './extract/html';
 import { extractFonts, extractTypeScale } from './extract/fonts';
 import { getSharp } from './media';
@@ -156,9 +156,9 @@ function mergeResults(a: ExtractResult, b: ExtractResult): ExtractResult {
   };
 }
 
-async function brandColors(page: PageRead, deps: RunnerDeps, signal: AbortSignal) {
+async function brandColors(page: PageRead, deps: RunnerDeps, signal: AbortSignal, rendered: RenderedPage | null) {
   const { fetcher } = deps;
-  const { html, finalUrl: pageUrl, cssTexts, result, rendered } = page;
+  const { html, finalUrl: pageUrl, cssTexts, result } = page;
   const hints = extractBrandHints(html, pageUrl);
   const all = [...hints.colors, ...colorsFromCss([hints.inlineCss, ...cssTexts].join('\n'), usageFromHtml(html))];
   if (rendered) all.push(...colorsFromUi(rendered.uiColors));
@@ -187,6 +187,20 @@ async function brandColors(page: PageRead, deps: RunnerDeps, signal: AbortSignal
       all.push(...(await colorsFromImage(sharp, body)));
     } catch {
       /* optional */
+    }
+  }
+  // What the page really shows is the strongest evidence: a color only the CSS mentions, that
+  // covers no part of the rendered page, is most likely from a library or an unused theme part.
+  const sharp2 = rendered?.uiShot ? await getSharp() : null;
+  if (rendered?.uiShot && sharp2) {
+    const seen = await colorsFromScreenshot(sharp2, rendered.uiShot);
+    if (seen.length) {
+      // keep a color only when the page shows it (covers part of it) or uses it on buttons, links,
+      // the header or the logo; everything else was only written in the CSS
+      const shown = (hex: string) => seen.some((s) => !isNeutralHex(s.hex) && colorDistance(s.hex, hex) < 40);
+      const kept = all.filter((c) => isNeutralHex(c.hex) || c.role === 'logo' || c.role === 'theme' || ['buttons', 'header', 'links', 'logo'].includes(c.source) || shown(c.hex));
+      all.length = 0;
+      all.push(...kept, ...seen);
     }
   }
   return mergeBrandColors(all, 10);
@@ -335,17 +349,28 @@ async function scanPage(
     }
     if (root.html.length >= cfg.maxHtmlBytes) warn('TOO_LARGE', 'The page is very large; only the first part was read.');
 
+    // One look at the rendered home page (when the server has a browser) measures the real colors,
+    // fonts and type sizes, even when deep scan is off for the crawl.
+    let measure: RenderedPage | null = root.rendered;
+    if (!measure && cfg.measurePages && (await deepAvailable())) {
+      try {
+        const r = await renderWithBrowser(root.finalUrl, deps.fetcher, cfg, signal);
+        if (!looksLikeBotCheck(r.html, root.html)) measure = r;
+      } catch {
+        /* the static reading stands */
+      }
+    }
     // Typography: never blocks or fails the scan either.
     try {
-      const fonts = extractFonts(root.html, root.finalUrl, root.cssTexts, usageFromHtml(root.html), root.rendered?.fonts);
-      const typeScale = extractTypeScale(root.cssTexts, root.html, root.rendered?.typeStyles);
+      const fonts = extractFonts(root.html, root.finalUrl, root.cssTexts, usageFromHtml(root.html), measure?.fonts);
+      const typeScale = extractTypeScale(root.cssTexts, root.html, measure?.typeStyles);
       if (fonts.length || typeScale.length) job.emit({ type: 'fonts.found', sourceId: src.id, fonts, typeScale });
     } catch {
       /* optional */
     }
     // Brand colors never block or fail the scan.
     try {
-      const colors = await brandColors(root, deps, signal);
+      const colors = await brandColors(root, deps, signal, measure);
       if (colors.length) job.emit({ type: 'brand.found', sourceId: src.id, colors });
     } catch {
       /* optional */

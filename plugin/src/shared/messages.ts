@@ -56,12 +56,13 @@ export interface BrandBookData {
   host: string;
   siteName: string;
   date: string;
-  colors: { hex: string; label: string; source: string }[];
+  colors: { hex: string; label: string; source: string; share?: number }[];
   fonts: FontInfo[];
   typeScale: TypeStyle[];
-  logo: { svg?: string; bytes?: Uint8Array } | null;
-  favicon: { svg?: string; bytes?: Uint8Array } | null;
-  icons: { name: string; svg: string }[];
+  /** lum: average relative luminance (0 black – 1 white) of the logo's visible pixels. */
+  logo: { svg?: string; bytes?: Uint8Array; lum?: number } | null;
+  favicon: { svg?: string; bytes?: Uint8Array; lum?: number } | null;
+  icons: { name: string; svg: string; lum?: number }[];
   images: { name: string; bytes: Uint8Array }[];
 }
 

@@ -4,7 +4,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { ApiError, CreateScanRequest, CreateScanResponse, HealthResponse, PollResponse, ReasonCode, ScanOptions } from '../../shared/types';
 import { parseUrlInput } from '../../shared/urls';
 import { loadConfig, type Config } from './config';
-import { deepAvailable } from './extract/deep';
+import { deepAvailable, deepKnown } from './extract/deep';
 import { JobStore } from './jobs';
 import { buildFile, buildPreview, getSharp, type MediaResponse } from './media';
 import { RobotsCache } from './net/robots';
@@ -53,6 +53,7 @@ export async function createApp(overrides: Partial<Config> = {}): Promise<AppHan
 
   const fetcher = new SafeFetcher(cfg);
   const robots = new RobotsCache(fetcher, cfg);
+  void deepAvailable(); // start the browser check now, not on the first request
   const jobs = new JobStore(cfg.jobTtlMs, cfg.maxJobs);
   const deps: RunnerDeps = { cfg, fetcher, robots };
   const sweeper = setInterval(() => jobs.sweep(), 60_000);
@@ -72,7 +73,7 @@ export async function createApp(overrides: Partial<Config> = {}): Promise<AppHan
   app.get('/v1/health', async (): Promise<HealthResponse> => ({
     ok: true,
     version: cfg.version,
-    features: { thumbnails: !!(await getSharp()), deepScan: await deepAvailable() },
+    features: { thumbnails: !!(await getSharp()), deepScan: deepKnown() },
     limits: {
       maxUrlsPerScan: cfg.maxUrlsPerScan,
       maxPagesPerSite: cfg.maxPagesPerSite,

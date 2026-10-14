@@ -72,11 +72,19 @@ export function isNeutral(hex: string): boolean {
   return sat < 0.14 || max - min < 22 || l > 0.95 || l < 0.05;
 }
 
-const dist = (a: string, b: string) => {
+export const colorDistance = (a: string, b: string) => dist(a, b);
+
+/** 0 for grey, 1 for a pure vivid color. */
+export function colorfulness(hex: string): number {
+  const [r, g, b] = rgbOf(hex);
+  return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+}
+
+function dist(a: string, b: string) {
   const x = rgbOf(a);
   const y = rgbOf(b);
   return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
-};
+}
 
 export interface BrandHints {
   colors: BrandColor[];
@@ -164,18 +172,6 @@ export function usageFromHtml(html: string): PageUsage {
   return { classes, inlineColors: inlineColors.slice(0, 2000) };
 }
 
-/** Stock colors that frameworks ship with. A site rarely picks one of these as its brand. */
-const FRAMEWORK_DEFAULTS = new Set([
-  // Tailwind 500/600/700
-  '#EF4444', '#DC2626', '#B91C1C', '#F97316', '#EA580C', '#F59E0B', '#D97706', '#EAB308', '#CA8A04', '#84CC16', '#65A30D',
-  '#22C55E', '#16A34A', '#15803D', '#10B981', '#059669', '#14B8A6', '#0D9488', '#06B6D4', '#0891B2', '#0EA5E9', '#0284C7',
-  '#3B82F6', '#2563EB', '#1D4ED8', '#6366F1', '#4F46E5', '#8B5CF6', '#7C3AED', '#A855F7', '#9333EA', '#D946EF', '#EC4899', '#DB2777', '#F43F5E', '#E11D48',
-  // Bootstrap 4/5
-  '#007BFF', '#0D6EFD', '#28A745', '#198754', '#DC3545', '#FFC107', '#17A2B8', '#0DCAF0', '#6610F2', '#6F42C1', '#E83E8C', '#D63384', '#FD7E14', '#20C997',
-  // WordPress presets and notices, iOS blue
-  '#FF6900', '#FCB900', '#7BDCB5', '#00D084', '#8ED1FC', '#0693E3', '#EB144C', '#F78DA7', '#9B51E0', '#CF2E2E', '#DC3232', '#46B450', '#FFB900', '#00A0D2', '#007AFF',
-]);
-
 export function colorsFromCss(css: string, usage?: PageUsage): BrandColor[] {
   const out: BrandColor[] = [];
   const text = css.slice(0, 600_000);
@@ -192,22 +188,22 @@ export function colorsFromCss(css: string, usage?: PageUsage): BrandColor[] {
     });
   };
   const colorOf = (v: string) => parseColor(resolve(v)) ?? parseChannels(resolve(v));
-  for (const [name, value] of vars) {
-    const role = NAME_ROLE.find(([re]) => re.test(name))?.[1];
-    if (!role || /foreground|-fg\b|text|border|muted|shadow|ring|input|disabled|neutral|subtle|placeholder|error|danger|success|warning|gr[ae]y|black|white|overlay|backdrop/i.test(name)) continue;
-    // defaults shipped by libraries (sliders, prose, players), not chosen by the site
-    if (/^--(swiper|tw-|plyr|pswp|fancybox|splide|glide|vjs|toastify|select2|flatpickr|mejs|slick|lg-|f-|wp--preset)/i.test(name)) continue;
-    const hex = colorOf(value);
-    if (!hex || isNeutral(hex)) continue;
-    out.push({ hex, role, source: name, weight: role === 'brand' ? 820 : role === 'accent' ? 600 : 300 });
-  }
 
-  // colors by where they are used: buttons and links carry the brand, utility classes do not.
-  // With the page's HTML at hand, a rule only counts as often as the page really uses its classes.
+  // Colors by where they are used: buttons and links carry the brand. With the page's HTML at hand
+  // a rule only counts as often as the page really uses its classes, so the colors of libraries
+  // and themes that ship CSS for things this page never shows simply drop out.
   const scores = new Map<string, number>();
+  const usedVars = new Set<string>();
+  const markVars = (value: string, depth = 0) => {
+    for (const r of value.matchAll(/var\(\s*(--[\w-]{1,60})/g)) {
+      if (usedVars.has(r[1]) || depth > 6) continue;
+      usedVars.add(r[1]);
+      const inner = vars.get(r[1]);
+      if (inner) markVars(inner, depth + 1);
+    }
+  };
   const bump = (hex: string | null, by: number) => {
     if (!hex || isNeutral(hex)) return;
-    if (FRAMEWORK_DEFAULTS.has(hex)) by *= 0.2; // Tailwind / Bootstrap / WordPress stock colors
     scores.set(hex, (scores.get(hex) ?? 0) + by);
   };
   for (const m of text.matchAll(/([^{}]{1,400})\{([^{}]{1,4000})\}/g)) {
@@ -217,8 +213,8 @@ export function colorsFromCss(css: string, usage?: PageUsage): BrandColor[] {
     if (/(^|[\s,.#>])(button|\.btn|\.button|\[type=.?submit|\.cta)|btn-primary|button--primary|primary/i.test(sel)) ctx = 12;
     else if (/(^|[\s,>])a(:hover|:focus|[\s,{.:]|$)|\.link|nav|header|navbar|logo|brand|hero/i.test(sel)) ctx = 6;
     else if (/(^|[\s,>])h[1-3]\b|\.title|heading|accent|highlight|badge/i.test(sel)) ctx = 4;
-    // utility frameworks and syntax-highlight themes add hundreds of colors nobody sees
-    const stock = /\.(text|bg|border|fill|stroke|from|via|to|ring|decoration|outline|shadow)-[a-z]+-\d{2,4}\b|\.hljs|\.token\.|\.cm-|\.ace_|\.prism|\.alert-|\.table-|\.list-group-item-|\.btn-(secondary|success|danger|warning|info|light|dark)\b|\.(has-[a-z-]+-color)/i.test(sel);
+    // utility-class naming (text-blue-500) and code-highlight themes: hundreds of colors nobody sees
+    const stock = /\.(text|bg|border|fill|stroke|from|via|to|ring|decoration|outline|shadow)-[a-z]+-\d{2,4}\b|\.hljs|\.token\.|\.cm-|\.ace_|\.prism/i.test(sel);
     if (usage) {
       let best = -1; // -1: the selector has no classes at all
       for (const part of sel.split(',')) {
@@ -234,6 +230,7 @@ export function colorsFromCss(css: string, usage?: PageUsage): BrandColor[] {
       if (best > 0.5) ctx *= Math.min(best, 40) * (/brand|primary|accent|secondary|theme|main/i.test(sel) ? 3 : 1);
       else if (stock) ctx = 0.1;
     } else if (stock) ctx = 0.1;
+    markVars(m[2]);
     for (const d of m[2].matchAll(/(^|;)\s*(background(?:-color)?|color|border(?:-color)?|fill|stroke|outline-color)\s*:\s*([^;]+)/gi)) {
       const prop = d[2].toLowerCase();
       const propW = prop.startsWith('background') ? 1.5 : prop === 'color' ? 1 : 0.5;
@@ -242,6 +239,18 @@ export function colorsFromCss(css: string, usage?: PageUsage): BrandColor[] {
   }
   // colors written straight into the HTML: style="" and Tailwind's bg-[#hex]
   for (const c of usage?.inlineColors ?? []) bump(parseColor(c), 6);
+
+  // Named brand variables (--primary, --brand…). With the page at hand, only the ones that a rule
+  // the page uses actually refers to: a library's own --x-primary does not count unless used.
+  for (const [name, value] of vars) {
+    const role = NAME_ROLE.find(([re]) => re.test(name))?.[1];
+    if (!role || /foreground|-fg\b|text|border|muted|shadow|ring|input|disabled|neutral|subtle|placeholder|error|danger|success|warning|gr[ae]y|black|white|overlay|backdrop/i.test(name)) continue;
+    if (usage && !usedVars.has(name)) continue;
+    const hex = colorOf(value);
+    if (!hex || isNeutral(hex)) continue;
+    out.push({ hex, role, source: name, weight: role === 'brand' ? 820 : role === 'accent' ? 600 : 300 });
+  }
+
   const top = [...scores].sort((a, b) => b[1] - a[1]);
   const max = top[0]?.[1] ?? 1;
   for (const [hex, n] of top.slice(0, 8)) {
@@ -250,6 +259,60 @@ export function colorsFromCss(css: string, usage?: PageUsage): BrandColor[] {
     out.push({ hex, role: 'palette', source: usage ? 'used on page' : 'stylesheet', weight: Math.round(Math.min(n * 4, 560) * (usage ? 0.4 + 0.6 * (n / max) : 1)) });
   }
   return out;
+}
+
+/**
+ * Colors of the rendered page itself (photos and video hidden), by how much of the page they cover.
+ * The first screen counts double: it is where a brand shows itself. Neutrals are kept here, marked
+ * "neutral", because a real palette has its dark and light too.
+ */
+export async function colorsFromScreenshot(sharp: any, png: Buffer): Promise<BrandColor[]> {
+  try {
+    const { data, info } = await sharp(png, { limitInputPixels: 80_000_000, failOn: 'none' })
+      .resize({ width: 160, kernel: 'nearest' })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const firstScreen = Math.round((900 / 1366) * info.width); // rows of the first viewport at this scale
+    const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
+    let total = 0;
+    for (let y = 0; y < info.height; y++) {
+      const w = y < firstScreen ? 2 : 1;
+      for (let x = 0; x < info.width; x++) {
+        const o = (y * info.width + x) * 3;
+        const r = data[o], g = data[o + 1], b = data[o + 2];
+        const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+        const cur = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+        cur.n += w;
+        cur.r += r * w;
+        cur.g += g * w;
+        cur.b += b * w;
+        buckets.set(key, cur);
+        total += w;
+      }
+    }
+    // join neighbouring buckets (anti-aliasing, subtle gradients) into real colors
+    const clusters: { hex: string; n: number }[] = [];
+    for (const v of [...buckets.values()].sort((a, b) => b.n - a.n)) {
+      const hex = toHex(v.r / v.n, v.g / v.n, v.b / v.n);
+      const near = clusters.find((c) => dist(c.hex, hex) < 30);
+      if (near) near.n += v.n;
+      else if (clusters.length < 40) clusters.push({ hex, n: v.n });
+    }
+    const out: BrandColor[] = [];
+    for (const c of clusters.sort((a, b) => b.n - a.n)) {
+      const share = c.n / total;
+      if (isNeutral(c.hex)) {
+        if (share >= 0.02) out.push({ hex: c.hex, role: 'neutral', source: 'page', weight: Math.round(200 + share * 600), share });
+        continue;
+      }
+      if (share < 0.005) continue; // a few pixels of an icon or anti-aliasing: not a brand color
+      out.push({ hex: c.hex, role: 'brand', source: 'page', weight: Math.round(Math.min(980, 520 + Math.sqrt(share) * 900 * (0.5 + colorfulness(c.hex)))), share });
+    }
+    return out.slice(0, 14);
+  } catch {
+    return [];
+  }
 }
 
 /** "59 130 246" (RGB channels) or "221 83% 53%" (HSL channels): how Tailwind and shadcn themes store colors. */
@@ -273,7 +336,8 @@ export function colorsFromUi(ui: { color: string; part: string }[]): BrandColor[
     const hex = parseColor(u.color);
     if (!hex || isNeutral(hex)) continue;
     const cur = scores.get(hex) ?? { n: 0, part: u.part };
-    cur.n += W[u.part] ?? 1;
+    // a vivid color carries a brand; pale tints and greyish shades of it are supporting colors
+    cur.n += (W[u.part] ?? 1) * (0.25 + colorfulness(hex));
     if ((W[u.part] ?? 0) > (W[cur.part] ?? 0)) cur.part = u.part;
     scores.set(hex, cur);
   }
@@ -332,18 +396,45 @@ export async function colorsFromImage(sharp: any, buf: Buffer, source = 'logo'):
   }
 }
 
-/** Merge sources, drop near-duplicates (keeping the strongest), order by importance, cap the list. */
+const lum = (hex: string) => {
+  const [r, g, b] = rgbOf(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/**
+ * The final palette: brand colors strongest first (near-duplicates merged; a color several methods
+ * agree on ranks higher), then the page's dark and light neutrals. Names are given by rank:
+ * Primary, Secondary, Accent…, Dark, Light.
+ */
 export function mergeBrandColors(all: BrandColor[], cap = 10): BrandColor[] {
   const sorted = all.map((c) => ({ ...c })).sort((a, b) => b.weight - a.weight);
-  const out: BrandColor[] = [];
+  const colors: BrandColor[] = [];
+  const neutrals: BrandColor[] = [];
   for (const c of sorted) {
-    const twin = out.find((o) => dist(o.hex, c.hex) < 24);
+    const bucket = isNeutral(c.hex) ? neutrals : colors;
+    const twin = bucket.find((o) => dist(o.hex, c.hex) < (bucket === colors ? 30 : 20));
     if (twin) {
-      // the same color found by several methods is stronger evidence
       twin.weight += Math.min(120, Math.round(c.weight / 6));
+      if (c.share !== undefined) twin.share = Math.max(twin.share ?? 0, c.share);
       continue;
     }
-    out.push(c);
+    bucket.push(c);
   }
-  return out.sort((a, b) => b.weight - a.weight).slice(0, cap);
+  // the vivid color leads; near-black navies and pale tints are the supporting cast
+  for (const c of colors) c.weight = Math.round(c.weight * (0.6 + 0.4 * colorfulness(c.hex)));
+  colors.sort((a, b) => b.weight - a.weight);
+  // far weaker than the main color: noise, not part of the brand
+  const top = colors[0]?.weight ?? 0;
+  const keep = colors.filter((c, i) => i === 0 || c.weight >= top * 0.5).slice(0, Math.max(1, cap - 2));
+  keep.forEach((c, i) => (c.name = i === 0 ? 'Primary' : i === 1 ? 'Secondary' : 'Accent'));
+  const pick = (test: (l: number) => boolean) => neutrals.filter((n) => test(lum(n.hex))).sort((a, b) => b.weight - a.weight)[0];
+  const dark = pick((l) => l < 0.2);
+  const light = pick((l) => l > 0.75);
+  const out = [...keep];
+  if (dark) out.push({ ...dark, role: 'neutral', name: keep.length ? 'Dark' : 'Primary' });
+  if (light) out.push({ ...light, role: 'neutral', name: 'Light' });
+  return out.slice(0, cap);
 }

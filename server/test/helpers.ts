@@ -71,7 +71,7 @@ export async function startFixture(): Promise<Fixture> {
       case url.pathname === '/sitemap.xml':
         return send(200, 'application/xml', `<?xml version="1.0"?><urlset><url><loc>http://127.0.0.1:${port}/site/extra</loc></url></urlset>`);
       case url.pathname === '/brand':
-        return send(200, 'text/html', `<html><head><meta name="theme-color" content="#0a7cff"><style>:root{--brand-primary:#ff6600}</style>
+        return send(200, 'text/html', `<html><head><meta name="theme-color" content="#0a7cff"><style>:root{--brand-primary:#ff6600} a{color:var(--brand-primary)}</style>
           <link rel="icon" href="/img/fav.png" sizes="32x32"></head><body><img src="/anim.gif" width="40" height="30" alt="loop"></body></html>`);
       case url.pathname === '/anim.gif':
         return send(200, 'image/gif', Buffer.from('R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=', 'base64'));

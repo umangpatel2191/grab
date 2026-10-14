@@ -133,12 +133,13 @@ describe('categories for website sections', () => {
     expect(run('gif')).toEqual(['a.gif']);
     expect(run('icon')).toEqual(['c.png']);
   });
-  it('merges brand colors from several pages, strongest first, no repeats', () => {
+  it('merges brand colors from several sites in the order the server ranked them, no repeats', () => {
     const m = mergeBrand({
-      s0: [{ hex: '#111111', role: 'palette', source: 'x', weight: 5 }, { hex: '#FF6600', role: 'theme', source: 't', weight: 1000 }],
+      s0: [{ hex: '#FF6600', role: 'brand', source: 't', weight: 600, name: 'Primary' }, { hex: '#111111', role: 'neutral', source: 'x', weight: 900, name: 'Dark' }],
       s1: [{ hex: '#FF6600', role: 'brand', source: 'v', weight: 800 }, { hex: '#0A7CFF', role: 'logo', source: 'l', weight: 700 }],
     });
-    expect(m.map((x) => x.hex)).toEqual(['#FF6600', '#0A7CFF', '#111111']);
+    expect(m.map((x) => x.hex)).toEqual(['#FF6600', '#111111', '#0A7CFF']);
+    expect(m[0].name).toBe('Primary');
     expect(mergeBrand({}, 3)).toEqual([]);
   });
   it('treats inline svgs as icons unless drawn large', () => {

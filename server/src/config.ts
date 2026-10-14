@@ -11,6 +11,8 @@ export interface Config {
   maxPagesPerSite: number;
   crawlConcurrency: number;
   deepConcurrency: number;
+  /** Render the home page once to measure colors, fonts and type sizes (needs a browser). */
+  measurePages: boolean;
   maxHtmlBytes: number;
   maxCssBytes: number;
   maxImageBytes: number;
@@ -44,6 +46,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     maxPagesPerSite: num('GRAB_MAX_PAGES', 200),
     crawlConcurrency: num('GRAB_CRAWL_CONCURRENCY', 4),
     deepConcurrency: num('GRAB_DEEP_CONCURRENCY', 2),
+    measurePages: process.env.GRAB_MEASURE !== '0',
     maxHtmlBytes: num('GRAB_MAX_HTML_MB', 3) * 1024 * 1024,
     maxCssBytes: 2 * 1024 * 1024,
     maxImageBytes: num('GRAB_MAX_IMAGE_MB', 25) * 1024 * 1024,

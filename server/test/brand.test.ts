@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { colorsFromCss, colorsFromImage, colorsFromManifest, colorsFromSvgPaints, colorsFromUi, extractBrandHints, isNeutral, mergeBrandColors, parseChannels, parseColor, usageFromHtml } from '../src/extract/brand';
+import { colorsFromCss, colorsFromImage, colorsFromManifest, colorsFromSvgPaints, colorsFromUi, extractBrandHints, isNeutral, mergeBrandColors, parseChannels, parseColor, usageFromHtml, colorsFromScreenshot, colorDistance } from '../src/extract/brand';
 import { getSharp } from '../src/media';
 
 describe('color parsing', () => {
@@ -100,7 +100,7 @@ describe('brand colors that match the real site', () => {
   it('agreement between methods raises a color', () => {
     const m = mergeBrandColors([
       { hex: '#00AA00', role: 'palette', source: 's', weight: 500 },
-      { hex: '#0000FF', role: 'palette', source: 's', weight: 520 },
+      { hex: '#0000AA', role: 'palette', source: 's', weight: 520 },
       { hex: '#00AA02', role: 'logo', source: 'logo', weight: 500 },
     ]);
     expect(m[0].hex).toBe('#00AA00');
@@ -124,5 +124,39 @@ describe('brand colors from what the page really uses', () => {
     expect(pal[0]).toBe('#1E0022');
     expect(pal).toContain('#BC9D5B');
     for (const stock of ['#EF4444', '#16A34A', '#DC3232', '#FF00AA']) expect(pal).not.toContain(stock);
+  });
+});
+
+describe('only what the page uses', () => {
+  it('ignores brand variables that no rule on the page refers to (library leftovers)', () => {
+    const css = ':root{--swal2-confirm-primary:#7066e0;--brand:#fcd100} .btn{background:var(--brand)} .swal2-confirm{background:var(--swal2-confirm-primary)}';
+    const c = colorsFromCss(css, usageFromHtml('<a class="btn">Go</a>'));
+    expect(c.some((x) => x.hex === '#FCD100')).toBe(true);
+    expect(c.some((x) => x.hex === '#7066E0')).toBe(false);
+  });
+  it('names the palette by rank and keeps the dark and light neutrals', () => {
+    const m = mergeBrandColors([
+      { hex: '#FCD100', role: 'brand', source: 'page', weight: 900 },
+      { hex: '#000000', role: 'neutral', source: 'page', weight: 650 },
+      { hex: '#FFFFFF', role: 'neutral', source: 'page', weight: 300 },
+      { hex: '#342A0B', role: 'brand', source: 'page', weight: 300 }, // weak: dropped
+    ]);
+    expect(m.map((c) => `${c.name} ${c.hex}`)).toEqual(['Primary #FCD100', 'Dark #000000', 'Light #FFFFFF']);
+  });
+  it('a monochrome site gets its dark color as primary', () => {
+    const m = mergeBrandColors([{ hex: '#08090A', role: 'theme', source: 'theme-color', weight: 1000 }, { hex: '#FFFFFF', role: 'neutral', source: 'page', weight: 300 }]);
+    expect(m[0]).toMatchObject({ hex: '#08090A', name: 'Primary' });
+  });
+  it('reads the colors that cover a rendered page, first screen counted double', async () => {
+    const sharp = await getSharp();
+    if (!sharp) return;
+    // 1366×1800: yellow hero on the first screen, black below, a thin white band
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1366" height="1800"><rect width="1366" height="1800" fill="#000"/><rect width="1366" height="600" fill="#fcd100"/><rect y="1700" width="1366" height="100" fill="#fff"/></svg>`;
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    const seen = await colorsFromScreenshot(sharp, png);
+    const yellow = seen.find((c) => colorDistance(c.hex, '#FCD100') < 30)!;
+    expect(yellow.role).toBe('brand');
+    expect(yellow.share!).toBeGreaterThan(0.3);
+    expect(seen.some((c) => c.role === 'neutral' && colorDistance(c.hex, '#000000') < 20)).toBe(true);
   });
 });

@@ -219,6 +219,46 @@ async function asGraphic(api: ApiClient, jobId: string, c: Candidate, signal: Ab
   return { bytes: r.bytes };
 }
 
+/**
+ * How light a logo is: the average luminance of its visible pixels, measured by drawing it on a
+ * canvas. The brand book uses it to never put a white logo on white (or a black one on black).
+ */
+async function withTone<T extends { svg?: string; bytes?: Uint8Array } | null>(g: T): Promise<T> {
+  if (!g) return g;
+  try {
+    const blob = g.svg ? new Blob([g.svg], { type: 'image/svg+xml' }) : new Blob([g.bytes! as BlobPart], { type: 'image/png' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      await new Promise<void>((ok, fail) => {
+        img.onload = () => ok();
+        img.onerror = () => fail(new Error('unreadable'));
+        img.src = url;
+      });
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const ctx = c.getContext('2d', { willReadFrequently: true })!;
+      const s = Math.min(64 / (img.naturalWidth || 64), 64 / (img.naturalHeight || 64));
+      ctx.drawImage(img, 0, 0, (img.naturalWidth || 64) * s, (img.naturalHeight || 64) * s);
+      const d = ctx.getImageData(0, 0, 64, 64).data;
+      let sum = 0;
+      let n = 0;
+      const lin = (v: number) => (v <= 10 ? v / 255 / 12.92 : Math.pow((v / 255 + 0.055) / 1.055, 2.4));
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) continue;
+        sum += 0.2126 * lin(d[i]) + 0.7152 * lin(d[i + 1]) + 0.0722 * lin(d[i + 2]);
+        n++;
+      }
+      if (n > 20) return { ...g, lum: sum / n };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    /* unknown tone: the brand book plays safe */
+  }
+  return g;
+}
+
 /** Collects everything the brand book needs: palette, type, logo, icons and the strongest images. */
 export async function collectBrandBook(api: ApiClient, jobId: string, src: BrandSource, onStep: (text: string) => void, signal: AbortSignal): Promise<BrandBookData> {
   const area = (c: Candidate) => {
@@ -230,8 +270,8 @@ export async function collectBrandBook(api: ApiClient, jobId: string, src: Brand
   const logoCand = src.items.find((c) => c.role === 'logo') ?? null;
   const favCand = src.items.filter((c) => c.origin === 'favicon').sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0] ?? null;
   onStep('Getting the logo');
-  const logo = logoCand ? await asGraphic(api, jobId, logoCand, signal).catch(() => null) : null;
-  const favicon = favCand && favCand !== logoCand ? await asGraphic(api, jobId, favCand, signal).catch(() => null) : null;
+  const logo = logoCand ? await asGraphic(api, jobId, logoCand, signal).then(withTone).catch(() => null) : null;
+  const favicon = favCand && favCand !== logoCand ? await asGraphic(api, jobId, favCand, signal).then(withTone).catch(() => null) : null;
 
   onStep('Getting icons');
   const iconCands = src.items
@@ -242,7 +282,7 @@ export async function collectBrandBook(api: ApiClient, jobId: string, src: Brand
     const g = await asGraphic(api, jobId, c, signal);
     if (!g?.svg || g.svg.length > 200_000) return null;
     const name = (c.title || fileNameFor(c, 0, used).replace(/\.[a-z0-9]+$/i, '')).replace(/[/\\]+/g, '-').slice(0, 40) || 'icon';
-    return { name, svg: g.svg };
+    return withTone({ name, svg: g.svg });
   });
 
   onStep('Getting key images');
@@ -260,7 +300,7 @@ export async function collectBrandBook(api: ApiClient, jobId: string, src: Brand
     host: src.host,
     siteName: name.charAt(0).toUpperCase() + name.slice(1),
     date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
-    colors: src.colors.map((c) => ({ hex: c.hex, label: ROLE_LABEL[c.role], source: c.source })),
+    colors: src.colors.map((c) => ({ hex: c.hex, label: c.name ?? ROLE_LABEL[c.role], source: c.source, share: c.share })),
     fonts: src.fonts,
     typeScale: src.typeScale,
     logo,
@@ -276,7 +316,7 @@ export function exportTokens(src: BrandSource): void {
   const color: Record<string, unknown> = {};
   const count = new Map<string, number>();
   for (const c of src.colors) {
-    const base = slug(ROLE_LABEL[c.role]);
+    const base = slug(c.name ?? ROLE_LABEL[c.role]);
     const n = (count.get(base) ?? 0) + 1;
     count.set(base, n);
     color[n > 1 ? `${base}-${n}` : base] = { $type: 'color', $value: c.hex, $description: `from ${c.source}` };

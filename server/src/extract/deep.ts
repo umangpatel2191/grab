@@ -33,14 +33,21 @@ async function launch(pw: any): Promise<any> {
 }
 
 /** True only when a browser really starts here, so the plugin never offers a deep scan that cannot run. */
+/** Answer from the finished check, or false while it still runs (health must answer instantly). */
+let known: boolean | null = null;
+export function deepKnown(): boolean {
+  if (known === null) void deepAvailable();
+  return known ?? false;
+}
+
 export function deepAvailable(): Promise<boolean> {
   probe ??= loadPlaywright()
     .then(async (pw) => {
       const b = await launch(pw);
       await b.close().catch(() => undefined);
-      return true;
+      return (known = true);
     })
-    .catch(() => false);
+    .catch(() => (known = false));
   return probe;
 }
 
@@ -57,6 +64,8 @@ export interface RenderedPage {
   fonts: { part: 'body' | 'heading' | 'button'; family: string }[];
   /** Computed text styles of the first visible h1…h6, paragraph, button and small text. */
   typeStyles: MeasuredType[];
+  /** PNG of the page with photos and video hidden: the colors of the design itself. */
+  uiShot: Buffer | null;
 }
 
 // One shared browser; pages run in parallel up to deepConcurrency, the rest wait their turn.
@@ -112,6 +121,21 @@ export async function closeDeep() {
   browserPromise = null;
   await p?.then((b: any) => b.close()).catch(() => undefined);
 }
+
+// Hides photos, video, canvases and background pictures so only the design's own colors remain.
+const HIDE_MEDIA_SCRIPT = `(() => {
+  const style = document.createElement('style');
+  style.textContent = 'img, picture, video, canvas, iframe, object, embed, svg image { visibility: hidden !important; } * { animation: none !important; transition: none !important; }';
+  document.head.appendChild(style);
+  // photo backgrounds go, color gradients stay (they are often the brand color)
+  const all = document.querySelectorAll('body, body *');
+  for (let i = 0; i < all.length && i < 8000; i++) {
+    const el = all[i];
+    const bg = getComputedStyle(el).backgroundImage;
+    if (bg && bg.indexOf('url(') !== -1) el.style.setProperty('background-image', bg.split(/,(?![^(]*\\))/).filter((p) => p.indexOf('url(') === -1).join(',') || 'none', 'important');
+  }
+  window.scrollTo(0, 0);
+})()`;
 
 // Runs inside the page. A plain string on purpose: bundlers add helpers to functions that the page does not have.
 const MEASURE_SCRIPT = `(() => {
@@ -223,7 +247,17 @@ export async function renderWithBrowser(url: string, fetcher: SafeFetcher, cfg: 
 
     const extra: { backgroundImages: string[]; uiColors: RenderedPage['uiColors']; fonts: RenderedPage['fonts']; typeStyles: RenderedPage['typeStyles'] } = await page.evaluate(MEASURE_SCRIPT);
     const html: string = await page.content();
-    return { html: html.slice(0, cfg.maxHtmlBytes), networkImages: [...networkImages], ...extra };
+    // a picture of the design without its photos: what colors cover the page
+    let uiShot: Buffer | null = null;
+    try {
+      await page.evaluate(HIDE_MEDIA_SCRIPT);
+      await page.waitForTimeout(150);
+      const height: number = await page.evaluate('Math.min(document.documentElement.scrollHeight, 7000)');
+      uiShot = await page.screenshot({ type: 'png', fullPage: true, clip: { x: 0, y: 0, width: 1366, height: Math.max(900, height) }, animations: 'disabled', timeout: 10_000 });
+    } catch {
+      uiShot = null;
+    }
+    return { html: html.slice(0, cfg.maxHtmlBytes), networkImages: [...networkImages], ...extra, uiShot };
   } catch (err) {
     if (err instanceof GrabError) throw err;
     if (signal?.aborted) throw new GrabError('CANCELED', 'Canceled.');

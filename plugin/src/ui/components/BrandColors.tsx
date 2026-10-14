@@ -37,10 +37,10 @@ export function BrandColors({ colors, onCopy, onCopyAll, onInsert }: Props) {
       </header>
       <div className="swatches">
         {colors.map((c) => (
-          <button key={c.hex} type="button" className="swatch" onClick={() => onCopy(c.hex)} title={`Copy ${c.hex} · from ${c.source}`} aria-label={`Copy ${c.hex}, ${ROLE_LABEL[c.role]} color`}>
+          <button key={c.hex} type="button" className="swatch" onClick={() => onCopy(c.hex)} title={`Copy ${c.hex} · from ${c.source}`} aria-label={`Copy ${c.hex}, ${c.name ?? ROLE_LABEL[c.role]} color`}>
             <span className="swatch-chip" style={{ background: c.hex }} />
             <span className="swatch-hex">{c.hex}</span>
-            <span className="swatch-role">{ROLE_LABEL[c.role]}</span>
+            <span className="swatch-role">{c.name ?? ROLE_LABEL[c.role]}</span>
           </button>
         ))}
       </div>

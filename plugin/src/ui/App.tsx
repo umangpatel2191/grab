@@ -80,12 +80,28 @@ export function App() {
   useEffect(() => {
     if (!loaded || !api) return;
     const ctl = new AbortController();
+    let timer: number | null = null;
     setServer({ state: 'checking', health: null });
-    api
-      .wake((n) => n > 1 && setServer({ state: 'waking', health: null, attempt: n }), ctl.signal)
-      .then((health: HealthResponse) => setServer({ state: 'up', health }))
-      .catch((err) => !(err instanceof ApiFailure && err.code === 'CANCELED') && setServer({ state: 'down', health: null }));
-    return () => ctl.abort();
+    const check = (first: boolean) => {
+      api
+        .wake((n) => (n > 1 || !first) && setServer({ state: 'waking', health: null, attempt: n }), ctl.signal)
+        .then((health: HealthResponse) => {
+          setServer({ state: 'up', health });
+          // a server that just started checks its browser in the background: ask again shortly
+          if (!health.features.deepScan) timer = window.setTimeout(() => api.health(8000).then((h) => !ctl.signal.aborted && setServer({ state: 'up', health: h })).catch(() => undefined), 20000);
+        })
+        .catch((err) => {
+          if (err instanceof ApiFailure && err.code === 'CANCELED') return;
+          setServer({ state: 'down', health: null });
+          // keep trying on our own: a sleeping free server can take a while
+          timer = window.setTimeout(() => check(false), 15000);
+        });
+    };
+    check(true);
+    return () => {
+      ctl.abort();
+      if (timer !== null) clearTimeout(timer);
+    };
   }, [loaded, api]);
 
   // ---- scanning

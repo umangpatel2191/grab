@@ -252,7 +252,7 @@ export function Results({ scan, api, settings: _settings, serverDeep, onNew, onC
   };
 
   const addPalette = async () => {
-    const r = await insertPalette(`GRAB · ${host} · Colors`, brand.map((c) => ({ hex: c.hex, label: ROLE_LABEL[c.role] })), true);
+    const r = await insertPalette(`GRAB · ${host} · Colors`, brand.map((c) => ({ hex: c.hex, label: c.name ?? ROLE_LABEL[c.role] })), true);
     onToast(r.message, r.ok ? 'ok' : 'error');
   };
 

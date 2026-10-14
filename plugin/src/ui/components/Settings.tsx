@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { HealthResponse } from '../../../../shared/types';
-import type { Settings as S } from '../../shared/messages';
+import { DEFAULT_SETTINGS, type Settings as S } from '../../shared/messages';
 import { ApiClient, ApiFailure, normalizeBackend } from '../api';
 import { Badge, Button, Icon } from './Bits';
 
@@ -43,6 +43,11 @@ export function SettingsPanel({ settings, setSettings, onClose, onClearHistory }
           <input id="backend" className="input grow" value={backend} spellCheck={false} onChange={(e) => setBackend(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void runTest()} />
           <Button small onClick={() => void runTest()} disabled={test.state === 'testing'}>{test.state === 'testing' ? 'Testing…' : 'Test and save'}</Button>
         </div>
+        {settings.backend !== DEFAULT_SETTINGS.backend ? (
+          <button type="button" className="link" onClick={() => { setBackend(DEFAULT_SETTINGS.backend); setSettings({ backend: DEFAULT_SETTINGS.backend }); }}>
+            Use the online GRAB server
+          </button>
+        ) : null}
         {test.state === 'ok' && test.health ? (
           <div className="row wrap">
             <Badge tone="good">Connected v{test.health.version}</Badge>

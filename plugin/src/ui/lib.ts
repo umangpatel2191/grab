@@ -139,7 +139,8 @@ export function pageLabel(url: string): string {
 export function mergeBrand(perSource: Record<string, BrandColor[]>, cap = 12): BrandColor[] {
   const seen = new Set<string>();
   const out: BrandColor[] = [];
-  for (const c of Object.values(perSource).flat().sort((a, b) => b.weight - a.weight)) {
+  // the server already ranks and names each palette (Primary first): keep that order
+  for (const c of Object.values(perSource).flat()) {
     if (seen.has(c.hex)) continue;
     seen.add(c.hex);
     out.push(c);
@@ -149,7 +150,7 @@ export function mergeBrand(perSource: Record<string, BrandColor[]>, cap = 12): B
 }
 
 export const ROLE_LABEL: Record<BrandColor['role'], string> = {
-  theme: 'Theme', brand: 'Brand', accent: 'Accent', background: 'Background', logo: 'Logo', palette: 'Site',
+  theme: 'Theme', brand: 'Brand', accent: 'Accent', background: 'Background', logo: 'Logo', palette: 'Site', neutral: 'Neutral',
 };
 
 export const SUPPORT_EMAIL = 'umangp737@gmail.com';

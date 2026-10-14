@@ -79,7 +79,7 @@ export interface Candidate {
   warnings: string[];
 }
 
-export type ColorRole = 'theme' | 'brand' | 'accent' | 'background' | 'logo' | 'palette';
+export type ColorRole = 'theme' | 'brand' | 'accent' | 'background' | 'logo' | 'palette' | 'neutral';
 
 export interface BrandColor {
   hex: string; // "#RRGGBB"
@@ -88,6 +88,10 @@ export interface BrandColor {
   source: string;
   /** Higher means more prominent on the page. */
   weight: number;
+  /** Palette name given after ranking: Primary, Secondary, Accent, Dark, Light. */
+  name?: string;
+  /** Share of the rendered page this color covers (0–1), when measured. */
+  share?: number;
 }
 
 export interface FontFile {

@@ -71,7 +71,7 @@ beforeAll(async () => {
   });
 
   fx = await startFixture();
-  h = await createApp({ allowPrivate: true, fetchTimeoutMs: 4000, rateLimitPerMinute: 100000 });
+  h = await createApp({ allowPrivate: true, measurePages: false, fetchTimeoutMs: 4000, rateLimitPerMinute: 100000 });
   await h.app.listen({ port: 0, host: '127.0.0.1' });
   base = `http://127.0.0.1:${(h.app.server.address() as { port: number }).port}`;
   apiMod = await import('../src/ui/api');

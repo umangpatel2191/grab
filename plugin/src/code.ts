@@ -72,8 +72,10 @@ async function placeItem(b: Batch, item: InsertItem): Promise<InsertResult> {
   } catch (err) {
     if (node) node.remove(); // never leave half-made layers behind
     b.failed++;
-    const reason = err instanceof Error ? err.message : 'Could not place this image';
-    return { id: item.id, ok: false, reason: /unsupported|invalid|corrupt/i.test(reason) ? 'Figma cannot read this image format' : reason };
+    const raw = err instanceof Error ? err.message : '';
+    // plain words for people, never a raw technical message
+    const reason = /unsupported|invalid|corrupt|format/i.test(raw) ? 'Figma cannot read this image format' : /size/i.test(raw) ? 'This image has no usable size' : 'Could not place this image';
+    return { id: item.id, ok: false, reason };
   }
 }
 
@@ -315,7 +317,7 @@ async function handle(msg: UiToMain) {
         figma.notify(r.message);
         post({ type: 'brandbook:done', ...r });
       } catch (err) {
-        post({ type: 'brandbook:done', ok: false, message: `Could not build the brand book: ${err instanceof Error ? err.message : 'unknown error'}` });
+        post({ type: 'brandbook:done', ok: false, message: 'Could not finish the brand book. Try again; if it keeps failing, try with fewer images.' });
       }
       return;
     }

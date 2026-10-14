@@ -37,7 +37,7 @@ export class ApiClient {
 
   constructor(base: string) {
     const n = normalizeBackend(base);
-    if (!n) throw new ApiFailure('BAD_BACKEND', 'The server address in Settings is not valid.');
+    if (!n) throw new ApiFailure('BAD_BACKEND', 'The GRAB server address in this build is not valid. Reinstall the plugin.');
     this.base = n;
   }
 
@@ -49,7 +49,7 @@ export class ApiClient {
     } catch (err) {
       if (signal?.aborted) throw new ApiFailure('CANCELED', 'Canceled.');
       if ((err as { name?: string }).name === 'TimeoutError') throw new ApiFailure('TIMEOUT', 'The server took too long to answer.');
-      throw new ApiFailure('OFFLINE', 'Cannot reach the GRAB server. Check your connection and the server address in Settings.');
+      throw new ApiFailure('OFFLINE', 'Cannot reach the GRAB server. Check your internet connection; a sleeping server can take up to a minute to wake.');
     }
   }
 
@@ -63,7 +63,7 @@ export class ApiClient {
     }
     if (!res.ok) {
       const e = (body as ApiError | null)?.error;
-      throw new ApiFailure(e?.code ?? 'INTERNAL', e?.message ?? `The server answered with status ${res.status}.`, res.status);
+      throw new ApiFailure(e?.code ?? 'INTERNAL', e?.message ?? (res.status >= 500 ? 'The GRAB server is busy or restarting. Try again in a moment.' : 'The GRAB server could not handle that request.'), res.status);
     }
     return body as T;
   }
@@ -136,7 +136,7 @@ export class ApiClient {
       } catch {
         /* ignore */
       }
-      throw new ApiFailure(e?.code ?? 'INTERNAL', e?.message ?? `The server answered with status ${res.status}.`, res.status);
+      throw new ApiFailure(e?.code ?? 'INTERNAL', e?.message ?? (res.status >= 500 ? 'The GRAB server is busy or restarting. Try again in a moment.' : 'The GRAB server could not handle that request.'), res.status);
     }
     const buf = new Uint8Array(await res.arrayBuffer());
     return { bytes: buf, mime: (res.headers.get('content-type') || '').split(';')[0] };

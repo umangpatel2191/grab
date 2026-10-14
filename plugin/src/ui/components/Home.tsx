@@ -86,10 +86,12 @@ export function Home({ input, setInput, settings, setSettings, history, server, 
             {[1, 5, 10, 25, 50, 100, 200].filter((n) => n <= maxPages).map((n) => <option key={n} value={n}>{n === 1 ? 'Just this page' : n === maxPages ? `Whole site (up to ${n})` : `Up to ${n}`}</option>)}
           </select>
         </label>
-        <label className={`check-row${deepOk ? '' : ' disabled'}`}>
-          <input type="checkbox" disabled={!deepOk} checked={settings.deep && deepOk} onChange={(e) => setSettings({ deep: e.target.checked })} />
-          <span>Deep scan <small>{deepOk ? 'renders every page in a browser; JavaScript-only pages are rendered automatically' : 'not installed on this server'}</small></span>
-        </label>
+        {deepOk ? (
+          <label className="check-row">
+            <input type="checkbox" checked={settings.deep} onChange={(e) => setSettings({ deep: e.target.checked })} />
+            <span>Deep scan <small>slower; also finds images that scripts add later</small></span>
+          </label>
+        ) : null}
       </div>
 
       <Button variant="primary" className="big" icon="download" disabled={!canFetch} onClick={() => onFetch(parsed.valid)}>

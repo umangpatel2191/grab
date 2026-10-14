@@ -315,11 +315,12 @@ select.input { padding-right: 8px; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* ---- brand kit bar */
-.brandkit { display: flex; align-items: center; gap: 12px; margin: 4px 0 16px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(120deg, var(--sunken), var(--bg)); }
-.brandkit-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.brandkit { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 4px 0 16px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(120deg, var(--sunken), var(--bg)); }
+.brandkit-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.brandkit-text strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brandkit-text strong { font-size: 13px; }
 .brandkit-text span { font-size: 12px; color: var(--muted); }
-.brandkit-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.brandkit-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
 
 /* ---- last scan card */
 .last-scan { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 18px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunken); cursor: pointer; }

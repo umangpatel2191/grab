@@ -258,7 +258,17 @@ export async function buildBrandBook(data: BrandBookData): Promise<{ ok: boolean
   const made = { variables: 0, paintStyles: 0, textStyles: 0, components: 0 };
   const slides: FrameNode[] = [];
   const next = () => slides.length + 1;
-  const sections = ['Logo', 'Color', 'Typography', ...(data.icons.length ? ['Iconography'] : []), ...(data.images.length ? ['Imagery'] : [])];
+  // the contents list exactly the slides that will be made, with their real numbers
+  const sections: { title: string; n: number }[] = [];
+  {
+    let n = 3;
+    if (data.logo) sections.push({ title: 'Logo', n }), (n += 2);
+    if (data.colors.length) sections.push({ title: 'Color', n: n++ });
+    if (data.fonts.length) sections.push({ title: 'Typography', n: n++ });
+    if (data.typeScale.length) sections.push({ title: 'Type scale', n: n++ });
+    if (data.icons.length) sections.push({ title: 'Iconography', n: n++ });
+    if (data.images.length) sections.push({ title: 'Imagery', n: n++ });
+  }
 
   // ---------------------------------------------------------------- cover
   {
@@ -324,14 +334,14 @@ export async function buildBrandBook(data: BrandBookData): Promise<{ ok: boolean
     recolorChrome(s, W - 560, W, bandInk);
     put(s, await txt(ctx, 'Contents', 120, ctx.display, ink, { ls: -3 }), M, 170);
     put(s, await txt(ctx, `A guide to the ${ctx.brandName} identity, collected from the live website: the logo, colors, typography${data.icons.length ? ', icons' : ''}${data.images.length ? ' and imagery' : ''} as they are used today.`, 26, ctx.body, ink, { w: 900, lh: 40, opacity: 0.7 }), M, 340);
-    let y = 520;
+    let y = 480;
     for (let i = 0; i < sections.length; i++) {
-      const num = await txt(ctx, String(i + 3).padStart(2, '0'), 30, ctx.display, contrast(primary, PAPER) >= 3 ? primary : ink);
+      const num = await txt(ctx, String(sections[i].n).padStart(2, '0'), 30, ctx.display, contrast(primary, PAPER) >= 3 ? primary : ink);
       put(s, num, M, y);
-      put(s, await txt(ctx, sections[i], 38, ctx.bodySemi, ink), M + 110, y - 4);
+      put(s, await txt(ctx, sections[i].title, 38, ctx.bodySemi, ink), M + 110, y - 4);
       const rule = rect(1000, 1, ink, 0, LINE_ON_LIGHT);
       put(s, rule, M, y + 66);
-      y += 92;
+      y += 80;
     }
     const big = await txt(ctx, ctx.brandName.charAt(0).toUpperCase(), 520, ctx.display, bandInk, { opacity: 0.18 });
     put(s, big, W - 560 + (560 - big.width) / 2, (H - big.height) / 2);

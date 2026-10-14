@@ -4,6 +4,7 @@ import { downloadOne, downloadZip, failureText, insertIntoFigma, type Failure, t
 import type { ApiClient } from '../api';
 import { insertFonts, insertPalette, sendBrandBook } from '../bridge';
 import { collectBrandBook, exportTokens, type BrandSource } from '../actions';
+import { ApiFailure } from '../api';
 import {
   DEFAULT_FILTERS, applyFilters, categoryOf, copyText, formatDims, hostLabel, mergeBrand, pageLabel, reasonText,
   ROLE_LABEL, type Category, type Filters, type Measured,
@@ -245,7 +246,7 @@ export function Results({ scan, api, settings: _settings, serverDeep, onNew, onC
       const r = await sendBrandBook(data);
       onToast(r.message, r.ok ? 'ok' : 'error');
     } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Could not build the brand book.', 'error');
+      onToast(err instanceof ApiFailure ? err.message : 'Could not build the brand book. Try again in a moment.', 'error');
     } finally {
       setBookStep(null);
     }
@@ -388,7 +389,7 @@ export function Results({ scan, api, settings: _settings, serverDeep, onNew, onC
                   <>
                     <strong>{scan.sources.length > 0 && scan.sources.every((s) => s.warning?.code === 'BLOCKED_BY_SITE' && s.count === 0) ? 'This site blocks automated tools' : 'No images found'}</strong>
                     <span>{scan.sources.length > 0 && scan.sources.every((s) => s.warning?.code === 'BLOCKED_BY_SITE' && s.count === 0)
-                      ? 'Its firewall refuses requests from tools like GRAB, so nothing can be read. Deep scan will not help. Ask the site owner to allow GRAB, or save the images from your browser.'
+                      ? 'Its firewall refuses requests from tools like GRAB, so nothing can be read. Ask the site owner to allow GRAB, or save the images from your browser.'
                       : serverDeep ? 'The page may build its images with JavaScript. Try again with deep scan on.' : 'The page may build its images with JavaScript, or the site blocks tools. Try another link.'}</span>
                   </>
                 )}

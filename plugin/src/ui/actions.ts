@@ -21,9 +21,10 @@ export interface Progress {
 }
 
 export function failureText(err: unknown): string {
+  // server messages are written for people; anything else is replaced with plain words
   if (err instanceof ApiFailure) return err.message;
-  if (err instanceof Error) return err.message;
-  return 'Something went wrong.';
+  if (err instanceof DOMException && err.name === 'AbortError') return 'Stopped.';
+  return 'Could not get this file. Try again in a moment.';
 }
 
 /** Run async work with at most `size` tasks at once, in order of the list. */

@@ -16,8 +16,9 @@ export function HelpPanel({ onClose, onToast }: { onClose: () => void; onToast: 
         <ol className="how">
           <li>Paste one or more website links and press Fetch.</li>
           <li>Browse brand colors, images, icons, GIFs and videos. Nothing downloads until you choose.</li>
-          <li>Select what you want, then Insert into Figma, Save, or make a ZIP.</li>
-          <li>Pick how many pages of each site to read. GRAB follows the menu, footer and sitemap and shows each picture once.</li>
+          <li>Hover a picture to view it large, add it to Figma, or open its link. Select several to Save, ZIP or Add to Figma.</li>
+          <li>Create Brand Book builds brand guidelines in Figma; Export tokens saves design tokens for developers.</li>
+          <li>Your last scan stays until you start a new one.</li>
         </ol>
 
         <h3>Good to know</h3>
@@ -25,11 +26,18 @@ export function HelpPanel({ onClose, onToast }: { onClose: () => void; onToast: 
           <li>Click a color to copy it. “Add to Figma” makes swatches and color styles.</li>
           <li>Video files up to 50 MB can be saved. Streams and embeds open at the source; Figma gets the poster image.</li>
           <li>Pages behind a login cannot be read. Sites that show a bot check to browsers fall back to the normal scan.</li>
-          <li>Pages that build their images with JavaScript are rendered in a browser automatically; Deep scan does this for every page.</li>
+          <li>Pages that build their images with JavaScript are rendered in a browser automatically when the server can.</li>
         </ul>
 
         <h3>Shortcuts</h3>
         <p className="legal"><kbd>⌘/Ctrl ↵</kbd> fetch · <kbd>/</kbd> search · <kbd>A</kbd> select all · <kbd>D</kbd> download · <kbd>I</kbd> insert · <kbd>Esc</kbd> clear</p>
+
+        <h3>Guide and privacy</h3>
+        <p className="legal">
+          <a className="link" href="https://github.com/umangpatel2191/grab/blob/main/docs/USER-GUIDE.md" target="_blank" rel="noopener noreferrer">User guide</a>
+          {'  ·  '}
+          <a className="link" href="https://github.com/umangpatel2191/grab/blob/main/docs/PRIVACY.md" target="_blank" rel="noopener noreferrer">Privacy policy</a>
+        </p>
 
         <h3>Contact</h3>
         <p className="legal">Questions, bugs or ideas? Email us.</p>

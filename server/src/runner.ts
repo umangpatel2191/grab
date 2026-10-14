@@ -319,13 +319,8 @@ async function scanPage(
     }
     const cssCache = new Map<string, Promise<string | null>>();
     const deepOn = !!options.deep && (await deepAvailable());
-    if (options.deep && !deepOn) warn('DEEP_UNAVAILABLE', 'Deep scan is not installed on this server; showing the normal scan.');
-    const onDeepFail = (code: ReasonCode) => {
-      if (code === 'BLOCKED_BY_SITE') warn(code, 'This site shows a bot check to browsers, so deep scan was skipped. Everything below comes from the normal scan.');
-      else if (code === 'TIMEOUT') warn(code, 'Deep scan took too long on this page (heavy page or busy server), so the normal scan is shown. It found everything in the page code; only images added later by scripts can be missing.');
-      else if (code === 'DEEP_UNAVAILABLE') warn(code, 'The deep scan browser could not start on the server right now, so the normal scan is shown.');
-      else if (code !== 'CANCELED') warn(code, 'Deep scan could not read this page, so the normal scan is shown.');
-    };
+    // Deep scan is an extra: when the browser cannot run, is blocked, or is too slow, the normal
+    // scan simply stands. The user is not shown an error for something they still got results for.
     // the quick read first, so images show within seconds; the browser adds what scripts build
     let first = await readPage(src.url, false, deps, signal, cssCache);
     if (first.type === 'media') {
@@ -344,7 +339,7 @@ async function scanPage(
     let autoDeep = false;
     const imageCount = first.page.result.candidates.filter((c) => c.origin !== 'favicon').length;
     if (deepOn || (imageCount < 6 && (await deepAvailable()))) {
-      const again = await readPage(src.url, true, deps, signal, cssCache, deepOn ? onDeepFail : undefined).catch(() => null);
+      const again = await readPage(src.url, true, deps, signal, cssCache).catch(() => null);
       if (again?.type === 'html' && again.page.rendered) {
         // without deep scan, keep rendering the other pages only if rendering found more here
         const more = again.page.result.candidates.length > first.page.result.candidates.length;

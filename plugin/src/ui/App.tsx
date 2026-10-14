@@ -10,6 +10,7 @@ import { HelpPanel } from './components/Help';
 import { SettingsPanel } from './components/Settings';
 import { clearPreviews } from './previews';
 import { useScan } from './scan';
+import type { SavedScan } from './reducer';
 
 interface ToastMsg {
   id: number;
@@ -27,6 +28,8 @@ export function App() {
   const [server, setServer] = useState<ServerStatus>({ state: 'checking', health: null });
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [startedAt, setStartedAt] = useState(0);
+  const [lastScan, setLastScan] = useState<SavedScan | null>(null);
+  const pendingRestore = useRef<SavedScan | null>(null);
   const [, tick] = useState(0);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -40,6 +43,11 @@ export function App() {
         setSettingsState({ ...DEFAULT_SETTINGS, ...m.settings, backend: DEFAULT_SETTINGS.backend });
       }
       if (m.history) setHistory(m.history);
+      const ls = m.lastScan as SavedScan | null;
+      if (ls && ls.snapshot && Array.isArray(ls.snapshot.items)) {
+        setLastScan(ls);
+        pendingRestore.current = ls; // reopen right where the user left off
+      }
       setLoaded(true);
     });
     sendToMain({ type: 'storage:get' });
@@ -108,7 +116,23 @@ export function App() {
   }, [loaded, api]);
 
   // ---- scanning
-  const scanApi = useScan(getApi);
+  const saveLast = useCallback((saved: SavedScan) => {
+    setLastScan(saved);
+    sendToMain({ type: 'storage:set', key: 'lastScan', value: saved });
+  }, []);
+  const scanApi = useScan(getApi, saveLast);
+  useEffect(() => {
+    if (!loaded || !pendingRestore.current) return;
+    const saved = pendingRestore.current;
+    pendingRestore.current = null;
+    void scanApi.restore(saved);
+  }, [loaded, scanApi]);
+  const openLast = useCallback(() => {
+    if (lastScan) {
+      clearPreviews();
+      void scanApi.restore(lastScan);
+    }
+  }, [lastScan, scanApi]);
   const { state: scan } = scanApi;
 
   const toast = useCallback((text: string, tone: 'ok' | 'error' = 'ok') => {
@@ -121,6 +145,9 @@ export function App() {
   const startScan = useCallback(
     (urls: string[]) => {
       clearPreviews();
+      // a new scan replaces the saved one
+      setLastScan(null);
+      sendToMain({ type: 'storage:set', key: 'lastScan', value: null });
       setStartedAt(Date.now());
       const entry: HistoryEntry = { urls, at: Date.now() };
       setHistory((h) => {
@@ -173,6 +200,8 @@ export function App() {
       <main className="main">
         {!loaded ? (
           <div className="empty"><strong>Loading…</strong></div>
+        ) : onResultsScreen && api && !scan.jobId ? (
+          <div className="empty" role="status"><strong>Opening your last scan…</strong><span>Waking the server so previews and downloads work.</span></div>
         ) : onResultsScreen && api ? (
           <Results
             scan={scan}
@@ -201,6 +230,8 @@ export function App() {
             error={scan.phase === 'error' ? scan.error?.message ?? 'Something went wrong.' : server.state === 'down' ? 'The GRAB server is waking up or busy. It retries on its own; try again in a minute.' : null}
             onFetch={startScan}
             onClearHistory={clearHistory}
+            lastScan={lastScan}
+            onOpenLast={openLast}
           />
         )}
       </main>

@@ -226,6 +226,19 @@ describe('plugin client against the real server', () => {
     expect(insertEnds.at(-1)).toEqual({ canceled: true });
   });
 
+  it('keeps a finished scan: snapshot, then restore into a new job with the same items', async () => {
+    const snap = await api.snapshot(scan.jobId!);
+    expect(snap.items.length).toBe(scan.items.length);
+    const { jobId } = await api.restore(snap);
+    let s = scanReducer(initialScan, { type: 'restored', saved: { savedAt: 1, urls: [fx.base + '/'], snapshot: snap, sources: scan.sources, rejected: [], brand: scan.brand, fonts: {}, typeScale: {} } });
+    expect(s).toMatchObject({ phase: 'done', jobId: null });
+    expect(s.items.length).toBe(scan.items.length);
+    s = scanReducer(s, { type: 'rejob', jobId });
+    const img = s.items.find((c) => c.kind === 'image' && c.url.endsWith('/img/1.png'))!;
+    const r = await api.bytes(api.previewUrl(jobId, img.id, 100), new AbortController().signal);
+    expect(r.bytes.length).toBeGreaterThan(10);
+  });
+
   it('reports a dead server clearly', async () => {
     const dead = new apiMod.ApiClient('http://127.0.0.1:9');
     await expect(dead.health(1500)).rejects.toMatchObject({ code: 'OFFLINE' });

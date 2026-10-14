@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 export interface Config {
   port: number;
   host: string;
@@ -13,6 +14,8 @@ export interface Config {
   deepConcurrency: number;
   /** Render the home page once to measure colors, fonts and type sizes (needs a browser). */
   measurePages: boolean;
+  /** Signs scan snapshots so a plugin can restore its last scan after a server restart. */
+  secret: string;
   maxHtmlBytes: number;
   maxCssBytes: number;
   maxImageBytes: number;
@@ -47,13 +50,14 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     crawlConcurrency: num('GRAB_CRAWL_CONCURRENCY', 4),
     deepConcurrency: num('GRAB_DEEP_CONCURRENCY', 2),
     measurePages: process.env.GRAB_MEASURE !== '0',
+    secret: process.env.GRAB_SECRET || crypto.randomBytes(32).toString('hex'),
     maxHtmlBytes: num('GRAB_MAX_HTML_MB', 3) * 1024 * 1024,
     maxCssBytes: 2 * 1024 * 1024,
     maxImageBytes: num('GRAB_MAX_IMAGE_MB', 25) * 1024 * 1024,
     maxVideoBytes: num('GRAB_MAX_VIDEO_MB', 50) * 1024 * 1024,
     maxCandidatesPerPage: num('GRAB_MAX_CANDIDATES', 3000),
     fetchTimeoutMs: num('GRAB_FETCH_TIMEOUT_MS', 15000),
-    jobTtlMs: num('GRAB_JOB_TTL_MIN', 20) * 60 * 1000,
+    jobTtlMs: num('GRAB_JOB_TTL_MIN', 180) * 60 * 1000,
     maxJobs: num('GRAB_MAX_JOBS', 100),
     pageConcurrency: num('GRAB_PAGE_CONCURRENCY', 3),
     rateLimitPerMinute: num('GRAB_RATE_LIMIT', 240),

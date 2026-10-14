@@ -252,6 +252,30 @@ describe('failures stay local', () => {
   });
 });
 
+describe('keeping a scan', () => {
+  it('signs a finished scan and restores it later (after a restart), with working previews', async () => {
+    const s = await scan([fx.base + '/']);
+    const snap = (await h.app.inject({ method: 'GET', url: `/v1/scans/${s.jobId}/snapshot` })).json() as { sources: unknown[]; items: Candidate[]; seal: string };
+    expect(snap.items.length).toBeGreaterThan(5);
+    const restored = await post('/v1/restore', snap);
+    expect(restored.statusCode).toBe(201);
+    const { jobId } = restored.json() as { jobId: string };
+    const img = snap.items.find((c) => c.url.endsWith('/img/1.png'))!;
+    const r = await h.app.inject({ method: 'GET', url: `/v1/scans/${jobId}/items/${img.id}/preview?w=100` });
+    expect(r.statusCode).toBe(200);
+  });
+
+  it('refuses a snapshot that was changed (no open proxy)', async () => {
+    const s = await scan([fx.base + '/']);
+    const snap = (await h.app.inject({ method: 'GET', url: `/v1/scans/${s.jobId}/snapshot` })).json() as { sources: unknown[]; items: Candidate[]; seal: string };
+    snap.items[0] = { ...snap.items[0], url: 'https://evil.example/anything.png' };
+    const r = await post('/v1/restore', snap);
+    expect(r.statusCode).toBe(404);
+    expect((await post('/v1/restore', { items: [], sources: [], seal: 'x' })).statusCode).toBe(404);
+    expect((await post('/v1/restore', { nope: 1 })).statusCode).toBe(400);
+  });
+});
+
 describe('request validation', () => {
   it('rejects malformed bodies', async () => {
     for (const body of [undefined, {}, { urls: 'a.com' }, { urls: [] }, { urls: [1, 2] }, { urls: Array(41).fill('a.com') }, { urls: ['a'.repeat(3000)] }]) {

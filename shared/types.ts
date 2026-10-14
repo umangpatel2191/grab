@@ -160,6 +160,17 @@ export interface PollResponse {
   events: ScanEvent[];
 }
 
+/** A finished scan as the server can rebuild it later: sources, items and the server's signature. */
+export interface ScanSnapshot {
+  sources: { id: string; url: string }[];
+  items: Candidate[];
+  seal: string;
+}
+
+export interface RestoreResponse {
+  jobId: string;
+}
+
 export interface HealthResponse {
   ok: true;
   version: string;

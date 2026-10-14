@@ -43,6 +43,14 @@ export class JobStore {
     private maxJobs: number,
   ) {}
 
+  /** A finished job rebuilt from a snapshot this server signed (see /v1/restore). */
+  restore(sources: { id: string; url: string }[], items: Candidate[]): Job {
+    const job = this.create(sources);
+    job.addItems(items);
+    job.finish('done');
+    return job;
+  }
+
   create(sources: { id: string; url: string }[]): Job {
     this.sweep();
     if (this.jobs.size >= this.maxJobs) {

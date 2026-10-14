@@ -2,12 +2,42 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { ScanOptions } from '../../../shared/types';
 import { ApiClient, ApiFailure } from './api';
 import { reasonText } from './lib';
-import { initialScan, scanReducer } from './reducer';
+import { initialScan, scanReducer, type SavedScan } from './reducer';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function useScan(getApi: () => ApiClient) {
+/** Figma keeps a few MB per plugin: very large scans are not saved rather than failing. */
+const MAX_SAVED_CHARS = 4_500_000;
+
+export function useScan(getApi: () => ApiClient, onSaved?: (saved: SavedScan) => void) {
   const [state, dispatch] = useReducer(scanReducer, initialScan);
+  const urlsRef = useRef<string[]>([]);
+  const savedJob = useRef<string | null>(null);
+
+  // A finished scan is saved (signed by the server) so it survives closing the plugin
+  // and server restarts. The next scan replaces it.
+  useEffect(() => {
+    if (state.phase !== 'done' || !state.jobId || savedJob.current === state.jobId || !onSaved) return;
+    const jobId = state.jobId;
+    savedJob.current = jobId;
+    const current = state;
+    void getApi()
+      .snapshot(jobId)
+      .then((snapshot) => {
+        const saved: SavedScan = {
+          savedAt: Date.now(),
+          urls: urlsRef.current,
+          snapshot,
+          sources: current.sources,
+          rejected: current.rejected,
+          brand: current.brand,
+          fonts: current.fonts,
+          typeScale: current.typeScale,
+        };
+        if (JSON.stringify(saved).length <= MAX_SAVED_CHARS) onSaved(saved);
+      })
+      .catch(() => undefined); // saving is a convenience, never an error
+  }, [state, getApi, onSaved]);
   const run = useRef(0);
   const jobRef = useRef<string | null>(null);
 
@@ -48,6 +78,7 @@ export function useScan(getApi: () => ApiClient) {
   const start = useCallback(
     async (urls: string[], options: ScanOptions, attempt = 0): Promise<void> => {
       const id = ++run.current;
+      urlsRef.current = urls;
       dispatch({ type: 'starting' });
       let api: ApiClient;
       try {
@@ -77,6 +108,29 @@ export function useScan(getApi: () => ApiClient) {
     [getApi, poll],
   );
 
+  /** Show a saved scan right away, then ask the server to rebuild it for previews and downloads. */
+  const restore = useCallback(
+    async (saved: SavedScan) => {
+      const id = ++run.current;
+      urlsRef.current = saved.urls;
+      dispatch({ type: 'restored', saved });
+      try {
+        const api = getApi();
+        await api.wake(() => undefined);
+        const { jobId } = await api.restore(saved.snapshot);
+        if (run.current !== id) return;
+        savedJob.current = jobId; // already saved: do not save it again
+        jobRef.current = jobId;
+        dispatch({ type: 'rejob', jobId });
+      } catch {
+        // the server cannot rebuild it (new server key, too old): fetch the site again
+        if (run.current === id && saved.urls.length) void start(saved.urls, {});
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getApi],
+  );
+
   const cancel = useCallback(async () => {
     const jobId = jobRef.current;
     if (jobId) await getApi().cancel(jobId);
@@ -88,5 +142,5 @@ export function useScan(getApi: () => ApiClient) {
     dispatch({ type: 'reset' });
   }, []);
 
-  return { state, start, cancel, reset, jobId: state.jobId };
+  return { state, start, cancel, reset, restore, jobId: state.jobId };
 }

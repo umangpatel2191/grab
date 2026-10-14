@@ -1,7 +1,8 @@
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
-import type { ApiError, CreateScanRequest, CreateScanResponse, HealthResponse, PollResponse, ReasonCode, ScanOptions } from '../../shared/types';
+import crypto from 'node:crypto';
+import type { ApiError, Candidate, CreateScanRequest, CreateScanResponse, HealthResponse, PollResponse, ReasonCode, RestoreResponse, ScanOptions, ScanSnapshot } from '../../shared/types';
 import { parseUrlInput } from '../../shared/urls';
 import { loadConfig, type Config } from './config';
 import { deepAvailable, deepKnown } from './extract/deep';
@@ -106,6 +107,34 @@ export async function createApp(overrides: Partial<Config> = {}): Promise<AppHan
     const job = jobs.create(sources);
     void runScan(job, options, deps).catch(() => job.finish('done'));
     const res: CreateScanResponse = { jobId: job.id, sources, rejected };
+    return reply.code(201).send(res);
+  });
+
+  // ---- keep a finished scan across plugin restarts and server restarts
+  const seal = (sources: unknown, items: unknown) => crypto.createHmac('sha256', cfg.secret).update(JSON.stringify({ sources, items })).digest('base64url');
+
+  app.get<{ Params: { id: string } }>('/v1/scans/:id/snapshot', async (req, reply) => {
+    const job = jobs.get(req.params.id);
+    if (!job) return sendError(reply, 'NOT_FOUND', 'This scan expired. Start it again.');
+    if (job.status === 'running') return sendError(reply, 'RATE_LIMITED', 'The scan is still running.');
+    const items = [...job.items.values()];
+    const res: ScanSnapshot = { sources: job.sources, items, seal: seal(job.sources, items) };
+    return reply.send(res);
+  });
+
+  // Only snapshots this server signed are accepted, so restoring can never fetch other URLs.
+  app.post('/v1/restore', { bodyLimit: 16 * 1024 * 1024 }, async (req, reply) => {
+    const body = (req.body ?? {}) as Partial<ScanSnapshot>;
+    if (!Array.isArray(body.items) || !Array.isArray(body.sources) || typeof body.seal !== 'string') {
+      return sendError(reply, 'INVALID_URL', 'That is not a saved scan.');
+    }
+    const expected = Buffer.from(seal(body.sources, body.items));
+    const given = Buffer.from(body.seal);
+    if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) {
+      return sendError(reply, 'NOT_FOUND', 'This saved scan cannot be restored. Scan the site again.');
+    }
+    const job = jobs.restore(body.sources, body.items as Candidate[]);
+    const res: RestoreResponse = { jobId: job.id };
     return reply.code(201).send(res);
   });
 

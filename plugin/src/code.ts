@@ -284,7 +284,8 @@ async function handle(msg: UiToMain) {
     case 'storage:get': {
       const settings = ((await figma.clientStorage.getAsync('grab:settings')) as Settings | undefined) ?? null;
       const history = ((await figma.clientStorage.getAsync('grab:history')) as HistoryEntry[] | undefined) ?? null;
-      post({ type: 'storage:data', settings, history });
+      const lastScan = (await figma.clientStorage.getAsync('grab:lastScan')) ?? null;
+      post({ type: 'storage:data', settings, history, lastScan });
       return;
     }
     case 'storage:set':

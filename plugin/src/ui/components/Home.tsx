@@ -3,7 +3,8 @@ import { parseUrlInput } from '../../../../shared/urls';
 import type { HealthResponse } from '../../../../shared/types';
 import type { HistoryEntry, Settings } from '../../shared/messages';
 import { Badge, Button } from './Bits';
-import { reasonText } from '../lib';
+import { hostLabel, reasonText } from '../lib';
+import type { SavedScan } from '../reducer';
 
 export type ServerStatus = { state: 'checking' | 'up' | 'waking' | 'down'; health: HealthResponse | null; attempt?: number };
 
@@ -19,9 +20,11 @@ interface Props {
   error: string | null;
   onFetch: (urls: string[]) => void;
   onClearHistory: () => void;
+  lastScan: SavedScan | null;
+  onOpenLast: () => void;
 }
 
-export function Home({ input, setInput, settings, setSettings, history, server, starting, startingFor, error, onFetch, onClearHistory }: Props) {
+export function Home({ input, setInput, settings, setSettings, history, server, starting, startingFor, error, onFetch, onClearHistory, lastScan, onOpenLast }: Props) {
   const max = server.health?.limits.maxUrlsPerScan ?? 10;
   const parsed = useMemo(() => parseUrlInput(input, max), [input, max]);
   const canFetch = parsed.valid.length > 0 && !starting;
@@ -34,6 +37,16 @@ export function Home({ input, setInput, settings, setSettings, history, server, 
         <h2>Collect everything from a website</h2>
         <p>Brand colors, every image, icon, SVG, GIF and video across the whole site. Preview first, take only what you need.</p>
       </div>
+
+      {lastScan ? (
+        <button type="button" className="last-scan" onClick={onOpenLast} title={lastScan.urls.join('\n')}>
+          <span className="last-scan-text">
+            <strong>Last scan · {hostLabel(lastScan.urls[0] ?? lastScan.snapshot.sources[0]?.url ?? '')}{lastScan.urls.length > 1 ? ` +${lastScan.urls.length - 1}` : ''}</strong>
+            <span>{lastScan.snapshot.items.length} assets · {Object.values(lastScan.brand).flat().length} colors · {ago(lastScan.savedAt)}. Kept until you scan again.</span>
+          </span>
+          <span className="last-scan-open">Open →</span>
+        </button>
+      ) : null}
 
       <label className="label" htmlFor="links">Website links</label>
       <textarea
@@ -112,4 +125,13 @@ export function Home({ input, setInput, settings, setSettings, history, server, 
       ) : null}
     </div>
   );
+}
+
+function ago(t: number): string {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h ago`;
+  return `${Math.round(h / 24)} d ago`;
 }

@@ -1,4 +1,4 @@
-import type { BrandColor, Candidate, FontInfo, ReasonCode, ScanEvent, TypeStyle } from '../../../shared/types';
+import type { BrandColor, Candidate, FontInfo, ReasonCode, ScanEvent, ScanSnapshot, TypeStyle } from '../../../shared/types';
 
 export interface SourceView {
   id: string;
@@ -24,6 +24,18 @@ export interface ScanState {
   error: { code: string; message: string } | null;
 }
 
+/** The last finished scan, kept in Figma until the next scan replaces it. */
+export interface SavedScan {
+  savedAt: number;
+  urls: string[];
+  snapshot: ScanSnapshot;
+  sources: SourceView[];
+  rejected: ScanState['rejected'];
+  brand: ScanState['brand'];
+  fonts: ScanState['fonts'];
+  typeScale: ScanState['typeScale'];
+}
+
 export const initialScan: ScanState = {
   phase: 'idle',
   jobId: null,
@@ -43,7 +55,9 @@ export type ScanAction =
   | { type: 'starting' }
   | { type: 'started'; jobId: string; sources: { id: string; url: string }[]; rejected: { input: string; code: ReasonCode }[] }
   | { type: 'events'; events: ScanEvent[]; next: number; status: 'running' | 'done' | 'canceled' }
-  | { type: 'fail'; error: { code: string; message: string } };
+  | { type: 'fail'; error: { code: string; message: string } }
+  | { type: 'restored'; saved: SavedScan }
+  | { type: 'rejob'; jobId: string };
 
 function addItems(state: ScanState, list: Candidate[]): Pick<ScanState, 'items' | 'seen'> {
   const seen = { ...state.seen };
@@ -100,5 +114,21 @@ export function scanReducer(state: ScanState, action: ScanAction): ScanState {
     }
     case 'fail':
       return { ...state, phase: 'error', error: action.error };
+    case 'restored': {
+      const { saved } = action;
+      return {
+        ...initialScan,
+        ...addItems(initialScan, saved.snapshot.items),
+        phase: 'done',
+        jobId: null, // set by 'rejob' once the server has rebuilt the scan
+        sources: saved.sources,
+        rejected: saved.rejected,
+        brand: saved.brand,
+        fonts: saved.fonts,
+        typeScale: saved.typeScale,
+      };
+    }
+    case 'rejob':
+      return { ...state, jobId: action.jobId };
   }
 }

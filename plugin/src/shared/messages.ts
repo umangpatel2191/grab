@@ -34,7 +34,7 @@ export interface InsertResult {
 
 export type UiToMain =
   | { type: 'storage:get' }
-  | { type: 'storage:set'; key: 'settings' | 'history'; value: unknown }
+  | { type: 'storage:set'; key: 'settings' | 'history' | 'lastScan'; value: unknown }
   | { type: 'insert:start'; batchId: string; frameName: string; total: number }
   | { type: 'insert:chunk'; batchId: string; items: InsertItem[] }
   | { type: 'insert:end'; batchId: string; canceled: boolean }
@@ -45,7 +45,7 @@ export type UiToMain =
   | { type: 'resize'; width: number; height: number };
 
 export type MainToUi =
-  | { type: 'storage:data'; settings: Settings | null; history: HistoryEntry[] | null }
+  | { type: 'storage:data'; settings: Settings | null; history: HistoryEntry[] | null; lastScan: unknown }
   | { type: 'insert:chunk-result'; batchId: string; results: InsertResult[] }
   | { type: 'insert:done'; batchId: string; placed: number; failed: number }
   | { type: 'palette:done'; ok: boolean; message: string }

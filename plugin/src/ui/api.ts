@@ -1,4 +1,4 @@
-import type { ApiError, CreateScanResponse, HealthResponse, PollResponse, ReasonCode, ScanOptions } from '../../../shared/types';
+import type { ApiError, CreateScanResponse, HealthResponse, PollResponse, ReasonCode, RestoreResponse, ScanOptions, ScanSnapshot } from '../../../shared/types';
 
 export class ApiFailure extends Error {
   constructor(
@@ -85,6 +85,15 @@ export class ApiClient {
         await new Promise((r) => setTimeout(r, 2500));
       }
     }
+  }
+
+  /** The finished scan, signed by the server, so it can be restored after a restart. */
+  snapshot(jobId: string) {
+    return this.json<ScanSnapshot>(`/v1/scans/${encodeURIComponent(jobId)}/snapshot`, {}, 30000);
+  }
+
+  restore(snap: ScanSnapshot) {
+    return this.json<RestoreResponse>('/v1/restore', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(snap) }, 60000);
   }
 
   createScan(urls: string[], options: ScanOptions) {

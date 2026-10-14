@@ -7,5 +7,9 @@ services:
     dockerContext: .
     healthCheckPath: /v1/health
     envVars:
+      - key: GRAB_LOW_MEMORY
+        value: "1"
+      - key: GRAB_DEEP_CONCURRENCY
+        value: "1"
       - key: GRAB_SECRET
         generateValue: true

@@ -12,7 +12,17 @@ export interface MediaResponse {
 
 let sharpPromise: Promise<any | null> | null = null;
 export function getSharp(): Promise<any | null> {
-  sharpPromise ??= import('sharp').then((m) => m.default ?? m).catch(() => null);
+  sharpPromise ??= import('sharp')
+    .then((m) => {
+      const sharp = m.default ?? m;
+      if (process.env.GRAB_LOW_MEMORY === '1') {
+        // a 512 MB server: no decoded-image cache, one image at a time per call
+        sharp.cache(false);
+        sharp.concurrency(1);
+      }
+      return sharp;
+    })
+    .catch(() => null);
   return sharpPromise;
 }
 

@@ -27,7 +27,11 @@ async function launch(pw: any): Promise<any> {
       // small servers: keep Chromium lean (no GPU, shared memory off /dev/shm, a capped JS heap)
       return await pw.chromium.launch({
         headless: true,
-        args: ['--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--disable-extensions', '--mute-audio', '--js-flags=--max-old-space-size=256', '--renderer-process-limit=2'],
+        args: [
+          '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--disable-extensions', '--mute-audio', '--js-flags=--max-old-space-size=256', '--renderer-process-limit=2',
+          // fewer processes on a 512 MB server (one site per process is not needed for reading pages)
+          ...(process.env.GRAB_LOW_MEMORY === '1' ? ['--disable-site-isolation-trials', '--disable-features=site-per-process,Translate,BackForwardCache', '--renderer-process-limit=1'] : []),
+        ],
         ...t,
       });
     } catch (err) {

@@ -125,7 +125,8 @@ async function readPage(
   await Promise.all(result.stylesheets.map((css) => loadCss(css, 0)));
   const extraImages = rendered?.networkImages ?? [];
   if (extraCss.length || extraImages.length) {
-    result = mergeResults(result, extractFromHtml(html, finalUrl, xopts, extraCss.slice(0, 1500), extraImages));
+    // only the extra URLs are new: no need to parse the page a second time
+    result = mergeResults(result, extractFromHtml('', finalUrl, xopts, extraCss.slice(0, 1500), extraImages));
   }
   return { type: 'html', page: { html, finalUrl, result, cssTexts, rendered } };
 }
@@ -319,10 +320,14 @@ async function scanPage(
     const cssCache = new Map<string, Promise<string | null>>();
     const deepOn = !!options.deep && (await deepAvailable());
     if (options.deep && !deepOn) warn('DEEP_UNAVAILABLE', 'Deep scan is not installed on this server; showing the normal scan.');
-    let first = await readPage(src.url, deepOn, deps, signal, cssCache, (code) => {
+    const onDeepFail = (code: ReasonCode) => {
       if (code === 'BLOCKED_BY_SITE') warn(code, 'This site shows a bot check to browsers, so deep scan was skipped. Everything below comes from the normal scan.');
-      else if (code !== 'CANCELED') warn(code, 'Deep scan failed for this page; showing the normal scan instead.');
-    });
+      else if (code === 'TIMEOUT') warn(code, 'Deep scan took too long on this page (heavy page or busy server), so the normal scan is shown. It found everything in the page code; only images added later by scripts can be missing.');
+      else if (code === 'DEEP_UNAVAILABLE') warn(code, 'The deep scan browser could not start on the server right now, so the normal scan is shown.');
+      else if (code !== 'CANCELED') warn(code, 'Deep scan could not read this page, so the normal scan is shown.');
+    };
+    // the quick read first, so images show within seconds; the browser adds what scripts build
+    let first = await readPage(src.url, false, deps, signal, cssCache);
     if (first.type === 'media') {
       publish([first.candidate]);
       job.emit({ type: 'source.done', sourceId: src.id, count: total });
@@ -333,15 +338,18 @@ async function scanPage(
       job.emit({ type: 'source.done', sourceId: src.id, count: 0 });
       return;
     }
+    publish(first.page.result.candidates);
 
-    // Pages that build everything with JavaScript: render them automatically when the server can.
+    // Rendered when asked (deep scan), or automatically when the page builds its images with JavaScript.
     let autoDeep = false;
     const imageCount = first.page.result.candidates.filter((c) => c.origin !== 'favicon').length;
-    if (!deepOn && imageCount < 6 && (await deepAvailable())) {
-      const again = await readPage(src.url, true, deps, signal, cssCache).catch(() => null);
-      if (again?.type === 'html' && again.page.rendered && again.page.result.candidates.length > first.page.result.candidates.length) {
-        first = again;
-        autoDeep = true;
+    if (deepOn || (imageCount < 6 && (await deepAvailable()))) {
+      const again = await readPage(src.url, true, deps, signal, cssCache, deepOn ? onDeepFail : undefined).catch(() => null);
+      if (again?.type === 'html' && again.page.rendered) {
+        // without deep scan, keep rendering the other pages only if rendering found more here
+        const more = again.page.result.candidates.length > first.page.result.candidates.length;
+        autoDeep = !deepOn && more;
+        if (deepOn || more) first = again;
       }
     }
     const root = first.page;
@@ -353,35 +361,38 @@ async function scanPage(
     }
     if (root.html.length >= cfg.maxHtmlBytes) warn('TOO_LARGE', 'The page is very large; only the first part was read.');
 
-    // One look at the rendered home page (when the server has a browser) measures the real colors,
-    // fonts and type sizes, even when deep scan is off for the crawl.
-    let measure: RenderedPage | null = root.rendered;
-    if (!measure && cfg.measurePages && (await deepAvailable())) {
-      try {
-        const r = await renderWithBrowser(root.finalUrl, deps.fetcher, cfg, signal, true);
-        if (!looksLikeBotCheck(r.html, root.html)) measure = r;
-      } catch {
-        /* the static reading stands */
-      }
-    }
-    // Typography: never blocks or fails the scan either.
-    try {
-      const fonts = extractFonts(root.html, root.finalUrl, root.cssTexts, usageFromHtml(root.html), measure?.fonts);
-      const typeScale = extractTypeScale(root.cssTexts, root.html, measure?.typeStyles);
-      if (fonts.length || typeScale.length) job.emit({ type: 'fonts.found', sourceId: src.id, fonts, typeScale });
-    } catch {
-      /* optional */
-    }
-    // Brand colors never block or fail the scan.
-    try {
-      const colors = await brandColors(root, deps, signal, measure);
-      if (colors.length) job.emit({ type: 'brand.found', sourceId: src.id, colors });
-    } catch {
-      /* optional */
-    }
+    // Images first: the user sees results while colors, fonts and the crawl are still working.
     publish(root.result.candidates);
 
-    // Read the rest of the site: navigation links first, then the sitemap.
+    // Brand insights run beside the crawl. One look at the rendered home page (when the server
+    // has a browser) measures the real colors, fonts and type sizes, even with deep scan off.
+    const insights = (async () => {
+      let measure: RenderedPage | null = root.rendered;
+      if (!measure && cfg.measurePages && (await deepAvailable())) {
+        try {
+          const r = await renderWithBrowser(root.finalUrl, deps.fetcher, cfg, signal, true);
+          if (!looksLikeBotCheck(r.html, root.html)) measure = r;
+        } catch {
+          /* the static reading stands */
+        }
+      }
+      try {
+        const fonts = extractFonts(root.html, root.finalUrl, root.cssTexts, usageFromHtml(root.html), measure?.fonts);
+        const typeScale = extractTypeScale(root.cssTexts, root.html, measure?.typeStyles);
+        if (fonts.length || typeScale.length) job.emit({ type: 'fonts.found', sourceId: src.id, fonts, typeScale });
+      } catch {
+        /* optional */
+      }
+      try {
+        const colors = await brandColors(root, deps, signal, measure);
+        if (colors.length) job.emit({ type: 'brand.found', sourceId: src.id, colors });
+      } catch {
+        /* optional */
+      }
+    })();
+
+    // Read the rest of the site: navigation links first, then the sitemap, within a time budget.
+    const deadline = Date.now() + cfg.siteBudgetMs;
     const want = Math.max(1, Math.min(options.pages ?? 1, cfg.maxPagesPerSite));
     if (want > 1 && !signal.aborted) {
       const siteHost = new URL(root.finalUrl).hostname;
@@ -408,9 +419,10 @@ async function scanPage(
       const progress = (url: string) =>
         job.emit({ type: 'source.progress', sourceId: src.id, pagesDone: done, pagesTotal: Math.min(want, done + queue.length), url });
       progress(root.finalUrl);
-      const pageDeep = deepOn || autoDeep;
+      // on a small server only the first page is rendered: a browser per page is what made scans slow
+      const pageDeep = (deepOn || autoDeep) && !cfg.lowMemory;
       const worker = async () => {
-        while (queue.length && visited.size < want && !signal.aborted) {
+        while (queue.length && visited.size < want && !signal.aborted && Date.now() < deadline) {
           const url = queue.shift()!;
           const k = normPage(url);
           if (visited.has(k)) continue;
@@ -432,8 +444,12 @@ async function scanPage(
         }
       };
       await Promise.all(Array.from({ length: cfg.crawlConcurrency }, worker));
+      if (!signal.aborted && Date.now() >= deadline && queue.length && visited.size < want) {
+        warn('TIMEOUT', `Stopped after ${Math.round(cfg.siteBudgetMs / 1000)} seconds with ${done} pages read, to keep the scan quick. Scan fewer pages, or scan a specific page for more.`);
+      }
     }
 
+    await insights;
     if (!total) warn('NOT_FOUND', 'No images were found on this site. It may block automatic tools.');
     job.emit({ type: 'source.done', sourceId: src.id, count: total });
   } catch (err) {

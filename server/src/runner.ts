@@ -132,10 +132,14 @@ async function readPage(
 
 /** A bot check, captcha or "please wait" page instead of the site. */
 function looksLikeBotCheck(rendered: string, original: string): boolean {
-  const sig = /captcha|sgcaptcha|cf-chl|challenge-platform|just a moment|checking your browser|verify you are human|attention required|ddos-guard|are you a robot/i;
+  // Only what a challenge page itself says. Plain "captcha" (reCAPTCHA on a contact form) and
+  // Cloudflare's "challenge-platform" script are on countless normal pages and prove nothing.
+  const sig = /<title>\s*(just a moment|attention required|access denied|security check)|checking your browser|verify you are human|cf-chl-|sgcaptcha|ddos-guard|are you a robot|enable javascript and cookies to continue/i;
   if (sig.test(rendered) && !sig.test(original)) return true;
-  // a tiny, self-refreshing, no-index page where the real one was large
-  return rendered.length < original.length / 5 && /http-equiv=["']?refresh/i.test(rendered);
+  // or the page lost nearly all of its words, e.g. a tiny self-refreshing placeholder
+  const words = (h: string) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<[^>]+>/gi, ' ').split(/\s+/).filter((w) => w.length > 2).length;
+  const before = words(original);
+  return before > 150 && words(rendered) < before / 6;
 }
 
 /** Union of two extractions of the same page; the first one's ids win for duplicates. */
@@ -354,7 +358,7 @@ async function scanPage(
     let measure: RenderedPage | null = root.rendered;
     if (!measure && cfg.measurePages && (await deepAvailable())) {
       try {
-        const r = await renderWithBrowser(root.finalUrl, deps.fetcher, cfg, signal);
+        const r = await renderWithBrowser(root.finalUrl, deps.fetcher, cfg, signal, true);
         if (!looksLikeBotCheck(r.html, root.html)) measure = r;
       } catch {
         /* the static reading stands */

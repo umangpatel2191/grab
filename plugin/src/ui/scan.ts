@@ -14,7 +14,7 @@ export function useScan(getApi: () => ApiClient) {
   useEffect(() => () => void (run.current = -1), []);
 
   const poll = useCallback(
-    async (api: ApiClient, jobId: string, id: number) => {
+    async (api: ApiClient, jobId: string, id: number, onLost: () => void) => {
       let since = 0;
       let failures = 0;
       for (;;) {
@@ -29,7 +29,8 @@ export function useScan(getApi: () => ApiClient) {
         } catch (err) {
           if (run.current !== id) return;
           if (err instanceof ApiFailure && err.code === 'NOT_FOUND') {
-            dispatch({ type: 'fail', error: { code: 'NOT_FOUND', message: 'The scan expired, maybe the server restarted. Start it again.' } });
+            // the server restarted (a deploy, or a free server recycled): run the scan again
+            onLost();
             return;
           }
           failures++;
@@ -45,7 +46,7 @@ export function useScan(getApi: () => ApiClient) {
   );
 
   const start = useCallback(
-    async (urls: string[], options: ScanOptions) => {
+    async (urls: string[], options: ScanOptions, attempt = 0): Promise<void> => {
       const id = ++run.current;
       dispatch({ type: 'starting' });
       let api: ApiClient;
@@ -56,11 +57,17 @@ export function useScan(getApi: () => ApiClient) {
         return;
       }
       try {
+        // after a restart the server may still be waking: wait for it first
+        if (attempt > 0) await api.wake(() => undefined);
         const res = await api.createScan(urls, options);
         if (run.current !== id) return;
         jobRef.current = res.jobId;
         dispatch({ type: 'started', jobId: res.jobId, sources: res.sources, rejected: res.rejected });
-        void poll(api, res.jobId, id);
+        void poll(api, res.jobId, id, () => {
+          if (run.current !== id) return;
+          if (attempt < 2) void start(urls, options, attempt + 1);
+          else dispatch({ type: 'fail', error: { code: 'NOT_FOUND', message: 'The server restarted several times during the scan. Try again in a minute, or with fewer pages.' } });
+        });
       } catch (err) {
         if (run.current !== id) return;
         const f = err instanceof ApiFailure ? err : null;

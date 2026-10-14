@@ -24,7 +24,12 @@ async function launch(pw: any): Promise<any> {
   let last: unknown = null;
   for (const t of tries) {
     try {
-      return await pw.chromium.launch({ headless: true, ...t });
+      // small servers: keep Chromium lean (no GPU, shared memory off /dev/shm, a capped JS heap)
+      return await pw.chromium.launch({
+        headless: true,
+        args: ['--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--disable-extensions', '--mute-audio', '--js-flags=--max-old-space-size=256', '--renderer-process-limit=2'],
+        ...t,
+      });
     } catch (err) {
       last = err;
     }
@@ -202,7 +207,8 @@ const MEASURE_SCRIPT = `(() => {
   return { backgroundImages: [...bgs].slice(0, 400), uiColors: colors, fonts, typeStyles };
 })()`;
 
-export async function renderWithBrowser(url: string, fetcher: SafeFetcher, cfg: Config, signal?: AbortSignal): Promise<RenderedPage> {
+/** lite: only measure the page (colors, fonts, type) — photos are not downloaded and scrolling is short. */
+export async function renderWithBrowser(url: string, fetcher: SafeFetcher, cfg: Config, signal?: AbortSignal, lite = false): Promise<RenderedPage> {
   if (!(await deepAvailable())) throw new GrabError('DEEP_UNAVAILABLE', 'Deep scan is not installed on this server.');
   await acquire(cfg.deepConcurrency, signal);
   let context: any = null;
@@ -221,7 +227,7 @@ export async function renderWithBrowser(url: string, fetcher: SafeFetcher, cfg: 
     await context.route('**/*', async (route: any) => {
       const req = route.request();
       const type = req.resourceType();
-      if (type === 'font' || type === 'media' || type === 'websocket') return route.abort();
+      if (type === 'font' || type === 'media' || type === 'websocket' || (lite && type === 'image')) return route.abort();
       try {
         await fetcher.assertPublicUrl(req.url());
       } catch {
@@ -235,7 +241,7 @@ export async function renderWithBrowser(url: string, fetcher: SafeFetcher, cfg: 
     await page.waitForLoadState('load', { timeout: 8000 }).catch(() => undefined);
     // scroll until the page stops growing so lazy and infinite sections load
     let lastHeight = 0;
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < (lite ? 4 : 25); i++) {
       const h: number = await page.evaluate('window.scrollBy(0, Math.round(window.innerHeight * 0.9)), document.documentElement.scrollHeight');
       await page.waitForTimeout(350);
       const atEnd: boolean = await page.evaluate('window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4');

@@ -154,6 +154,7 @@ export const ROLE_LABEL: Record<BrandColor['role'], string> = {
 };
 
 export const SUPPORT_EMAIL = 'umangp737@gmail.com';
+export const COFFEE_URL = 'https://buymeacoffee.com/umangmadnaka';
 
 /** File name that is safe on every operating system and never collides. */
 export function safeName(base: string, used: Set<string>): string {

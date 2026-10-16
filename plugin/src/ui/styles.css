@@ -330,3 +330,15 @@ select.input { padding-right: 8px; }
 .last-scan-text strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .last-scan-text span { font-size: 12px; color: var(--muted); }
 .last-scan-open { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+
+/* ---- support (Buy me a coffee) */
+.coffee { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; background: #FFDD00; color: #1a1400; font-size: 12px; font-weight: 600; text-decoration: none; border: 1px solid rgba(0,0,0,.08); transition: transform .12s, box-shadow .12s; }
+.coffee:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255, 200, 0, .35); }
+.coffee:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.coffee-card { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; padding: 14px; border-radius: 12px; background: linear-gradient(120deg, #FFF6BF, #FFE58A); color: #2a2000; text-decoration: none; border: 1px solid rgba(0,0,0,.06); }
+.coffee-card:hover { box-shadow: 0 6px 18px rgba(255, 200, 0, .3); }
+.coffee-card-icon { width: 40px; height: 40px; border-radius: 10px; background: #FFDD00; display: grid; place-items: center; flex: none; }
+.coffee-card-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: 12px; line-height: 1.4; }
+.coffee-card-text strong { font-size: 13px; }
+.coffee-card-cta { flex: none; padding: 7px 11px; border-radius: 999px; background: #1a1400; color: #FFDD00; font-size: 12px; font-weight: 700; white-space: nowrap; }
+@media (max-width: 420px) { .coffee span { display: none; } .coffee { padding: 0 8px; } }

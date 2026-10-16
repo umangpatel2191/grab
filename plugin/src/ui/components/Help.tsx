@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SUPPORT_EMAIL, copyText } from '../lib';
+import { COFFEE_URL, SUPPORT_EMAIL, copyText } from '../lib';
 import { Icon } from './Bits';
 
 export function HelpPanel({ onClose, onToast }: { onClose: () => void; onToast: (t: string) => void }) {
@@ -31,6 +31,15 @@ export function HelpPanel({ onClose, onToast }: { onClose: () => void; onToast: 
 
         <h3>Shortcuts</h3>
         <p className="legal"><kbd>⌘/Ctrl ↵</kbd> fetch · <kbd>/</kbd> search · <kbd>A</kbd> select all · <kbd>D</kbd> download · <kbd>I</kbd> insert · <kbd>Esc</kbd> clear</p>
+
+        <a className="coffee-card" href={COFFEE_URL} target="_blank" rel="noopener noreferrer">
+          <span className="coffee-card-icon"><Icon name="coffee" size={22} /></span>
+          <span className="coffee-card-text">
+            <strong>Enjoying GRAB?</strong>
+            <span>It is free and made by one designer. A coffee keeps the server running and new features coming.</span>
+          </span>
+          <span className="coffee-card-cta">Buy me a coffee</span>
+        </a>
 
         <h3>Guide and privacy</h3>
         <p className="legal">

@@ -51,6 +51,7 @@ Is it free? Yes. No account needed.
 Privacy: the links you paste are sent to the GRAB server to read those public pages; nothing from your Figma file is sent. Full policy: https://github.com/umangpatel2191/grab/blob/main/docs/PRIVACY.md
 User guide: https://github.com/umangpatel2191/grab/blob/main/docs/USER-GUIDE.md
 Support: umangp737@gmail.com
+Enjoying GRAB? Buy me a coffee: https://buymeacoffee.com/umangmadnaka
 
 Content you collect belongs to its owners — use it for reference and inspiration, and check the rights before using it in your work.
 ```

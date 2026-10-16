@@ -51,4 +51,4 @@ go back. Starting a new scan replaces it.
   poster image.
 - Content belongs to its owners: use it for reference and inspiration, and check the rights.
 
-Support: **umangp737@gmail.com** · Privacy: [PRIVACY.md](PRIVACY.md)
+Support: **umangp737@gmail.com** · ☕ [Buy me a coffee](https://buymeacoffee.com/umangmadnaka) · Privacy: [PRIVACY.md](PRIVACY.md)

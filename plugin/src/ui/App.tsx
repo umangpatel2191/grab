@@ -3,7 +3,8 @@ import type { HealthResponse } from '../../../shared/types';
 import { DEFAULT_SETTINGS, type HistoryEntry, type Settings } from '../shared/messages';
 import { ApiClient, ApiFailure } from './api';
 import { onMain, sendToMain } from './bridge';
-import { Button, IconButton, Logo } from './components/Bits';
+import { Button, Icon, IconButton, Logo } from './components/Bits';
+import { COFFEE_URL } from './lib';
 import { Home, type ServerStatus } from './components/Home';
 import { Results } from './components/Results';
 import { HelpPanel } from './components/Help';
@@ -193,6 +194,10 @@ export function App() {
           <span className={`dot ${dot}`} aria-hidden="true" />
           <span className="server-text">{dotText}</span>
         </span>
+        <a className="coffee" href={COFFEE_URL} target="_blank" rel="noopener noreferrer" title="Enjoying GRAB? Buy me a coffee">
+          <Icon name="coffee" size={15} />
+          <span>Support</span>
+        </a>
         <IconButton icon="help" label="Help" onClick={() => setShowHelp(true)} />
         <IconButton icon="gear" label="Settings" onClick={() => setShowSettings(true)} />
       </header>
